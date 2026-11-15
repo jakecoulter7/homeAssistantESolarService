@@ -8,13 +8,8 @@ RUN apk add --no-cache \
 
 WORKDIR /app
 
-RUN git clone https://github.com/jakecoulter7/homeAssistantESolarService.git src
-
-WORKDIR /app/src
+RUN git clone https://github.com/woeperbe/eSolarService.git .
 
 RUN make
 
-COPY run.sh /run.sh
-RUN chmod +x /run.sh
-
-CMD ["/run.sh"]
+CMD ["./esolard"]
