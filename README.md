@@ -43,7 +43,8 @@ is charging or discharging. Top left is today's production; top right is the wea
 battery, in 5-minute steps. Use **Day / Week** to switch between one day and a week of daily totals, and the
 ‹ › arrows to go back in time (a year of days is kept by default).
 
-![Week view](docs/week.png)
+<img width="1236" height="772" alt="image" src="https://github.com/user-attachments/assets/5e7a6ad6-84cc-4246-9674-65064679c604" />
+
 
 **Battery chart**: the battery level over the day, with the lowest and highest level.
 
@@ -147,22 +148,6 @@ systemd hands it to the service read-only.
 | `log_file` | empty | Also log to this file, with date and time (e.g. `/var/log/esolar/esolar.log`) |
 | `log_max_mb`, `log_keep` | `5`, `5` | Log file rotation: size in MB, old files kept |
 | `verbose` | `no` | Log every value of every reading (a lot of lines) |
-
-Example:
-
-```ini
-inverter_host = 192.168.1.41
-inverter_port = 1502
-poll_seconds  = 10
-timezone      = Europe/Brussels
-latitude      = 50.8503
-longitude     = 4.3517
-
-sql_active    = yes
-sql_server    = 192.168.1.20
-sql_user      = solar
-sql_password  = change-me
-```
 
 ---
 
@@ -303,27 +288,6 @@ MySQL's own error text (for example `Unknown column …`) appears in the log and
 
 ---
 
-## Reaching it from outside (reverse proxy)
-
-To open the dashboard from the internet, put it behind a web server you already have. Example with **Apache**
-on another machine (`a2enmod proxy proxy_http`), for `sun.example.com`:
-
-```apache
-<VirtualHost *:80>
-    ServerName sun.example.com
-    ProxyPreserveHost On
-    ProxyPass        / http://192.168.1.50/
-    ProxyPassReverse / http://192.168.1.50/
-</VirtualHost>
-```
-
-```sh
-sudo a2ensite sun.example.com && sudo systemctl reload apache2
-sudo certbot --apache -d sun.example.com      # free https certificate (Let's Encrypt)
-```
-
-The setup page and the Setup button stay local-network only, also through the proxy.
-Everything else (dashboard, `/json`) is visible to anyone who knows the address.
 
 **Optional: `esolar.local` on your network.** Install Avahi (`sudo apt install avahi-daemon`) and name the
 machine `esolar` (`sudo hostnamectl set-hostname esolar`); then `http://esolar.local/` works on iPhones, Macs
