@@ -1,0 +1,26 @@
+[Unit]
+Description=eSolar SolarEdge monitor (dashboard, /json, MySQL)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+# All settings are in /etc/esolard.conf. After changing it: sudo systemctl reload esolard
+ExecStart=/usr/local/bin/esolard
+ExecReload=/bin/kill -HUP $MAINPID
+# the config file (root only, it holds the SQL password) is handed to the service read-only
+LoadCredential=esolard.conf:/etc/esolard.conf
+Restart=always
+RestartSec=10
+DynamicUser=yes
+StateDirectory=esolar
+# log file folder /var/log/esolar (log_file in the config)
+LogsDirectory=esolar
+# port 80 is below 1024: allow only that, the program still runs as its own unprivileged user
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target
