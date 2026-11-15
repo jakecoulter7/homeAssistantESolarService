@@ -58,7 +58,7 @@
 // ---------------------------------------------------------------------------
 // Settings (command line, see usage())
 // ---------------------------------------------------------------------------
-static char     invHost[128] = "solaredge.woeper.be";  // leader inverter: DNS name or IP address
+static char     invHost[128] = "";  // leader inverter: DNS name or IP address
 static uint16_t invPort = 1502;                         // SolarEdge default is 1502 (check SetApp)
 static unsigned pollSeconds = 15;                       // 5 .. 3600
 static uint16_t httpPort = 80;
@@ -70,7 +70,7 @@ static char     tzName[64] = "";                        // time zone, e.g. Europ
 static char     confFile[400] = "";                     // config file actually read ("" = none)
 // SQL logging
 static bool     sqlActive = false;
-static char     sqlServer[128] = "database.woeper.be";
+static char     sqlServer[128] = "";
 static uint16_t sqlPort = 3306;
 static char     sqlTable[64] = "esolaredge.power";       // daily row
 static char     sqlLogTable[64] = "esolaredge.powerlog"; // 5-minute rows
