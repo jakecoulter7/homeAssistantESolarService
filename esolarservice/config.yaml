@@ -1,5 +1,5 @@
 name: eSolarService
-version: "0.0.4"
+version: "0.0.5"
 slug: esolarservice
 description: SolarEdge monitor using Modbus TCP
 
