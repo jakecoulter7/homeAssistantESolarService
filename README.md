@@ -11,12 +11,7 @@ locally over **Modbus TCP** and gives you:
 Everything runs on your own network. It doesn't use the SolarEdge cloud or any paid API.
 The program is one C file with no external libraries: only GCC is needed.
 
-![Dashboard, dark mode](docs/dashboard-dark.png)
-
-<table><tr>
-<td><img src="docs/dashboard-light.png" alt="Dashboard, light mode" width="520"></td>
-<td><img src="docs/dashboard-phone.png" alt="Dashboard on an iPhone" width="250"></td>
-</tr></table>
+<img width="1186" height="1655" alt="image" src="https://github.com/user-attachments/assets/d1e85d33-56f1-455e-938b-6da8747b264f" />
 
 ---
 
