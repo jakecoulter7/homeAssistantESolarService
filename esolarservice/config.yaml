@@ -1,0 +1,18 @@
+name: eSolarService
+version: "0.0.1"
+slug: esolarservice
+description: SolarEdge monitor using Modbus TCP
+
+startup: services
+boot: auto
+
+host_network: true
+
+arch:
+  - aarch64
+
+options:
+  inverter_host: ""
+
+schema:
+  inverter_host: str
