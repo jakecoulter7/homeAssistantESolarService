@@ -102,7 +102,6 @@ typedef struct {
 // Adjust to your system:
 static const DeviceCfg DEVICES[] = {
     { 1, 1, true },    // leader:   meter + battery
-    { 2, 0, false },   // follower: nothing extra
 };
 static const int NUM_DEVICES = sizeof(DEVICES) / sizeof(DEVICES[0]);
 
