@@ -84,7 +84,7 @@ Change it to match your installation (unit ID, number of meters, battery yes/no)
 
 ## Build and install
 
-Put all files in one folder (`esolard.c`, `WebPages.h`, `icon.h`, `Arduino.h`, `Makefile`,
+Put all files in one folder (`esolard.c`, `WebPages.h`, `icon.h`, `Makefile`,
 `esolard.service`, `esolard.conf`) and run:
 
 ```sh
