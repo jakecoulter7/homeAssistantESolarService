@@ -1,19 +1,18 @@
 ARG BUILD_FROM
-FROM $BUILD_FROM
+FROM ${BUILD_FROM}
 
 RUN apk add --no-cache \
     gcc \
     musl-dev \
-    make
+    make \
+    git
 
 WORKDIR /app
 
-COPY Makefile .
-COPY esolard.c .
-COPY WebPages.h .
-COPY icon.h .
-COPY esolard.conf .
+RUN git clone https://github.com/jakecoulter7/homeAssistantESolarService.git src
+
+WORKDIR /app/src
 
 RUN make
 
-CMD ["/app/esolard"]
+CMD ["./esolard"]
