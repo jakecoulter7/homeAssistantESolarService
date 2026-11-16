@@ -7,13 +7,10 @@ RUN apk add --no-cache \
 
 WORKDIR /app
 
-# Copy only the addon contents
-COPY esolarservice/ .
+COPY . .
 
-# Build esolard
 RUN make
 
-# Create runtime config
 RUN mkdir -p /etc
 
 RUN printf '%s\n' \
