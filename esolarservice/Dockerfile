@@ -15,7 +15,7 @@ RUN make
 RUN mkdir -p /etc
 
 RUN printf '%s\n' \
-'inverter_host = 192.168.68.110' \
+'inverter_host = 192.168.68.106' \
 'inverter_port = 1502' \
 'poll_seconds = 15' \
 'http_port = 80' \
