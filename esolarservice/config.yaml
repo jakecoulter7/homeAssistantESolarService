@@ -1,5 +1,5 @@
 name: eSolarService
-version: "0.0.13"
+version: "0.0.14"
 slug: esolarservice
 description: SolarEdge monitor using Modbus TCP
 
@@ -12,7 +12,25 @@ arch:
   - aarch64
 
 options:
-  inverter_host: ""
+  inverter_host: "192.168.68.106"
+  poll_seconds: 10
+  timezone: "Europe/London"
+  latitude: 
+  longitude: 
+  sql_active: false
+  sql_server: ""
+  sql_port: 3306
+  sql_user: ""
+  sql_password: ""
 
 schema:
   inverter_host: str
+  poll_seconds: int(5,3600)
+  timezone: str
+  latitude: float?
+  longitude: float?
+  sql_active: bool
+  sql_server: str?
+  sql_port: port
+  sql_user: str?
+  sql_password: password?

@@ -1,0 +1,7 @@
+// Backup
+$h = Invoke-RestMethod "http://homeassistant.local/history"; `
+$h | ConvertTo-Json -Depth 100 | Out-File "backups/history/current.json"; `
+$h.days | ForEach-Object { Invoke-WebRequest "http://homeassistant.local/history?day=$_" -OutFile "backups/history/$_.json" }; `
+Invoke-WebRequest "http://homeassistant.local/json" -OutFile "backups/history/state.json"
+
+// 
