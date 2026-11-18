@@ -2030,7 +2030,7 @@ static void handleRoot(int fd, bool local, bool head) {
         "<circle class=\"tr\" cx=\"12\" cy=\"12\" r=\"10\"/><circle class=\"tp\" cx=\"12\" cy=\"12\" r=\"10\"/></svg>"
         "<b id=\"tickn\"></b></span>",
         "ver " ESOLARD_VERSION " (c) WOEPER<span id=\"age\">loading&hellip;</span>",
-        "<a class=\"ghost\" href=\"/config\">Setup</a>"
+        local ? "<a class=\"ghost\" href=\"/config\">Setup</a>" : NULL
     sbPut(&o, INDEX_HTML);
     replyN(fd, 200, "text/html; charset=utf-8", o.p, o.n, NULL, head);
     sbFree(&o);
