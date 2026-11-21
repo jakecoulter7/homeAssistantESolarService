@@ -13,6 +13,6 @@ jobs:
         run: |
           curl -X POST \
             -H "Content-Type: application/json" \
-            https://ha.glebeha.uk/api/webhook/${{ secrets.HA_WEBHOOK_ID }} \
+            http://192.168.68.125:8123/api/webhook/${{ secrets.HA_WEBHOOK_ID }} \
             -d '{"action":"update_esolarservice"}'
         continue-on-error: true
