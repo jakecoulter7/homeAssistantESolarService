@@ -53,7 +53,7 @@
 #include "WebPages.h"      // dashboard and setup page: styles, HTML, JavaScript
 #include "icon.h"          // home-screen icon (PNG)
 
-#define ESOLARD_VERSION "1.3.5-linux"
+#define ESOLARD_VERSION "1.3.6-linux"
 
 // ---------------------------------------------------------------------------
 // Settings (command line, see usage())
@@ -805,9 +805,9 @@ static void updateDaily(const double* raw) {
 
 // ---------------------------------------------------------------------------
 // Usage chart (/history): today's house use per 5 minutes split by source
-// (from solar / battery / grid, W), the solar production (W) and the battery charge level (0.1 %).
+// (from solar / battery / grid import, W), solar production (W), battery charge level (0.1 %), and grid export (W).
 // Today: RAM + a copy in <dataDir>/hist-today.bin every 30 minutes, at a restart and at stop.
-// Finished days: <dataDir>/hist/yyyymmdd.bin (2880 bytes: the 5 series of 288 slots, 0xFFFF = empty),
+// Finished days: <dataDir>/hist/yyyymmdd.bin (3456 bytes: the 6 series of 288 slots, 0xFFFF = empty),
 // the last histKeepDays days.
 // ---------------------------------------------------------------------------
 #ifndef HIST_STEP_MIN
@@ -819,14 +819,16 @@ static void updateDaily(const double* raw) {
 typedef struct {
     uint16_t s[HIST_SLOTS];      // from solar (W)
     uint16_t b[HIST_SLOTS];      // from battery (W)
-    uint16_t g[HIST_SLOTS];      // from grid (W)
+    uint16_t g[HIST_SLOTS];      // from grid: import (W)
     uint16_t p[HIST_SLOTS];      // solar production (W)
     uint16_t c[HIST_SLOTS];      // battery charge level (0.1 %)
+    uint16_t e[HIST_SLOTS];      // exported to grid (W)
 } HistData;
 
 static HistData hist;            // protected by dataMutex
 static int      histDay = 0, histSlot = -1;
 static double   histSum[4] = { 0, 0, 0, 0 };
+static double   histImportSum = 0, histExportSum = 0;  // grid split: import (W) and export (W)
 static int      histCount = 0;
 static double   histSocSum = 0;
 static int      histSocCount = 0;
@@ -965,21 +967,28 @@ static void histAdd(double solarW, double batW, double gridW, double prodW, doub
         histSlot = slot;
         for (int k = 0; k < 3; k++) { histVSum[k] = 0; histVCount[k] = 0; }
         histSum[0] = histSum[1] = histSum[2] = histSum[3] = 0;
+        histImportSum = histExportSum = 0;
         histSocSum = 0;
         histSocCount = 0;
         histCount = 0;
     }
     histSum[0] += solarW;
     histSum[1] += batW;
-    histSum[2] += gridW;
     histSum[3] += isnan(prodW) ? 0 : prodW;
+    // Split grid into import (negative) and export (positive)
+    // gridW: + export, - import (based on METER_POSITIVE_IS_EXPORT = true)
+    if (!isnan(gridW)) {
+        if (gridW > 0) histExportSum += gridW;
+        else if (gridW < 0) histImportSum += -gridW;
+    }
     histCount++;
     if (!isnan(socPct) && socPct >= 0 && socPct <= 100) { histSocSum += socPct; histSocCount++; }
     for (int k = 0; k < 3; k++)                    // plausible mains voltage only
         if (volts && !isnan(volts[k]) && volts[k] > 50.0 && volts[k] < 999.0) { histVSum[k] += volts[k]; histVCount[k]++; }
     hist.s[slot] = histW(histSum[0] / histCount);
     hist.b[slot] = histW(histSum[1] / histCount);
-    hist.g[slot] = histW(histSum[2] / histCount);
+    hist.g[slot] = histW(histImportSum / histCount);
+    hist.e[slot] = histW(histExportSum / histCount);
     hist.p[slot] = histW(histSum[3] / histCount);
     hist.c[slot] = histSocCount ? (uint16_t)lround(histSocSum / histSocCount * 10.0) : HIST_NONE;
     pthread_mutex_unlock(&dataMutex);
@@ -2153,9 +2162,9 @@ static void handleHistory(int fd, const char* query, bool head) {
     }
     Sb o = { 0 };
     sbPrintf(&o, "{\"day\":%d,\"step\":%d,\"slot\":%d", day, HIST_STEP_MIN, slot);
-    const uint16_t* arr[5] = { copy.s, copy.b, copy.g, copy.p, copy.c };
-    const char* key[5] = { "s", "b", "g", "p", "c" };
-    for (int k = 0; k < 5; k++) {
+    const uint16_t* arr[6] = { copy.s, copy.b, copy.g, copy.p, copy.c, copy.e };
+    const char* key[6] = { "s", "b", "g", "p", "c", "e" };
+    for (int k = 0; k < 6; k++) {
         sbPrintf(&o, ",\"%s\":[", key[k]);
         for (int i = 0; i < HIST_SLOTS; i++) {
             if (i) sbPutc(&o, ',');

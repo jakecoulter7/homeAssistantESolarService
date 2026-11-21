@@ -105,7 +105,7 @@ function ls(k){try{return localStorage.getItem(k)==='1'}catch(e){return false}}
 function lset(k,v){try{localStorage.setItem(k,v?'1':'0')}catch(e){}}
 function lsd(k){try{return localStorage.getItem(k)!=='0'}catch(e){return true}}   // on unless switched off
 // dashboard parts: [switch, localStorage key, on by default]; defaultChecked too, so Discard doesn't flip them
-[['m_flow','showFlow',1],['m_garden','showGarden',1],['m_chart','showChart',1],['m_bchart','showBatChart',1],['m_pc','showPC',1],['m_det','showDetails',0]].forEach(function(x){
+[['m_flow','showFlow',1],['m_garden','showGarden',1],['m_chart','showChart',1],['m_imp','showImportChart',1],['m_exp','showExportChart',1],['m_det','showDetails',0]].forEach(function(x){
 var c=g(x[0]);c.checked=c.defaultChecked=x[2]?lsd(x[1]):ls(x[1]);
 c.addEventListener('change',function(){lset(x[1],c.checked);c.defaultChecked=c.checked;toast((c.checked?'Shown':'Hidden')+' on the dashboard (this browser)')})});
 })();
@@ -324,10 +324,10 @@ function tick(){
 }
 setInterval(tick,250);
 // the dashboard parts are switched on the setup page (Monitor) and remembered in this browser
-var showDetails=false,showChart=true,showBatChart=true,showPC=true,showFlow=true,showGarden=true,lastData=null,hist=null,histAt=0,hView=0,hOld={};
+var showDetails=false,showChart=true,showImportChart=true,showExportChart=true,showFlow=true,showGarden=true,lastData=null,hist=null,histAt=0,hView=0,hOld={};
 var wx=null;                                   // weather now, from /json
 try{showDetails=localStorage.getItem('showDetails')==='1';showGarden=localStorage.getItem('showGarden')!=='0';
-  showChart=localStorage.getItem('showChart')!=='0';showBatChart=localStorage.getItem('showBatChart')!=='0';showPC=localStorage.getItem('showPC')!=='0';showFlow=localStorage.getItem('showFlow')!=='0';}catch(e){}
+  showChart=localStorage.getItem('showChart')!=='0';showImportChart=localStorage.getItem('showImportChart')!=='0';showExportChart=localStorage.getItem('showExportChart')!=='0';showFlow=localStorage.getItem('showFlow')!=='0';}catch(e){}
 // Power flow picture (switched on the setup page, on by default). Moving dots + an arrow only on the
 // lines where power flows, in its direction: sun -> inverter, inverter -> home, grid <-> inverter, battery <-> inverter.
 var FLOW_MIN=20;                                                       // W: below this a line is idle
@@ -368,6 +368,8 @@ function wxIcon(night){
 }
 function flow(s){
   var P=s.production_w,Hw=s.house_w,G=s.grid_w,B=s.battery_w,soc=s.battery_soc_pct;
+  // Calculate production today from history
+  var prodToday=0;if(hist&&hist.p){var k=hist.step/60000;for(var i=0;i<hist.p.length;i++){if(hist.p[i]!=null)prodToday+=hist.p[i]*k;}}
   var ph=((Date.now()%900)/1000).toFixed(2);                           // keeps the dots moving smoothly across redraws
   function kwv(w){return w==null?D:f(Math.abs(w)/1000,2);}
   function on(w){return w!=null&&Math.abs(w)>=FLOW_MIN;}
@@ -458,7 +460,7 @@ function flow(s){
   v+='<circle class="nd'+(sunOn?' sun':'')+'" cx="'+(250+DX)+'" cy="64" r="58"/>';
   v+='<text class="fb" x="'+(250+DX)+'" y="66" text-anchor="middle">'+kwv(P)+'</text><text class="fl" x="'+(250+DX)+'" y="90" text-anchor="middle">kW solar now</text>';
   v+=wxIcon(wx?!wx.day:!sunOn);                                        // weather top right (night: moon)
-  v+='<text class="fs" x="20" y="30">Production today</text><text class="fb" x="20" y="64">'+(s.solar_today_kwh==null?D:f(s.solar_today_kwh,2))+'<tspan class="fu"> kWh</tspan></text>';
+  v+='<text class="fs" x="20" y="30">Production today</text><text class="fb" x="20" y="64">'+(prodToday>0?f(prodToday,2):D)+'<tspan class="fu"> kWh</tspan></text>';
   return '<section class="card flow">'+v+'</svg></section>';
 }
 // Usage chart (switched on the setup page): /history = per 5 min house use from solar (s), battery (b), grid (g) and solar production (p), in W; battery charge level (c) in 0.1 %
@@ -519,33 +521,17 @@ function pcPart(title,tot,items,foot){
        '<b>'+eTxt(it[2])+'</b><span class="pp">'+(pc==null?'':'('+pc+'%)')+'</span></div>';});
   return h+'</div></div>'+(foot||'')+'</div>';
 }
-function pcCard(s){
-  var d=hist&&hist.s?hist:null,P=null,S=null,B=null,G=null,k=d?d.step/60000:0;
-  if(d){P=0;S=0;B=0;G=0;for(var i=0;i<d.s.length;i++){if(d.s[i]==null)continue;
-    P+=d.p&&d.p[i]!=null?d.p[i]:0;S+=d.s[i];B+=d.b[i];G+=d.g[i];}P*=k;S*=k;B*=k;G*=k;}
-  var tg=d&&s.exported_today_kwh!=null?Math.min(s.exported_today_kwh,Math.max(0,P-S)):null,
-      tb=d&&tg!=null?Math.max(0,P-S-tg):null,C=d?S+B+G:null;
-  var h='<section class="card pc"><div class="pcs">';
-  h+=pcPart('Production',P,[['To home','home',S,'e1'],['To battery','bat',tb,'e2'],['To grid','grid',tg,'e3']]);
-  h+=pcPart('Consumption',C,[['From solar','sun',S,'u1'],['From battery','bat',B,'u2'],['From grid','grid',G,'u3']],
-    '<div class="pcf"><svg class="ic" viewBox="0 0 16 16">'+PCI.sun+'</svg> + <svg class="ic" viewBox="0 0 16 16">'+PCI.bat+'</svg> From solar and battery <b>'+
-    (d?eTxt(S+B)+(C>0?' ('+Math.round(100*(S+B)/C)+'%)':''):'–')+'</b></div>');
-  return h+'</div></section>';
-}
 function chart(){
-  var cd=chDay(),d=cd.d,h=chHead('Overview '+dayName(cd.day),cd.iv,ovSeg());
-  var n=d.s.length,W=chWidth(),H=138,L=34,R=8,T=10,B=24,pw=W-L-R,ph=H-T-B,max=0,e=[0,0,0],i,v;
-  // three layers drawn over each other (not stacked), like the SolarEdge app: solar production,
-  // consumption (house use) and the part of the house use that came from solar and battery
-  function P(k){return d.p&&d.p[k]!=null?d.p[k]:0;}function C(k){return d.s[k]+d.b[k]+d.g[k];}function F(k){return d.s[k]+d.b[k];}
-  for(i=0;i<n;i++){if(d.s[i]==null)continue;max=Math.max(max,P(i),C(i));e[0]+=P(i);e[1]+=C(i);e[2]+=F(i);}
+  var cd=chDay(),d=cd.d,h=chHead('Solar Production '+dayName(cd.day),cd.iv,ovSeg());
+  var n=d.s.length,W=chWidth(),H=138,L=34,R=8,T=10,B=24,pw=W-L-R,ph=H-T-B,max=0,e=0,i,v;
+  // Solar production chart: shows only solar production (p)
+  function P(k){return d.p&&d.p[k]!=null?d.p[k]:0;}
+  for(i=0;i<n;i++){if(d.s[i]==null)continue;max=Math.max(max,P(i));e+=P(i);}
   // round kW steps (0.2, 0.4, 0.5, 1, 2, 5) so there are at most 4 lines above 0
   var mk=Math.max(max/1000,0.1),st=[0.2,0.4,0.5,1,2,5].filter(function(x){return Math.ceil(mk/x)<=4;})[0]||5;
   var top=st*Math.ceil(mk/st);
   function X(i){return (L+(i+0.5)*pw/n).toFixed(1);}
   function Y(w){return (T+ph-ph*w/(top*1000)).toFixed(1);}
-  // pastel fill + solid line on top; gaps where no reading. own(k) = this source's part: the line is only
-  // drawn where the source gives something (and one point either side, so rises and falls show)
   function area(c,fn,own){var p='',q='',run=[];
     function used(k){return k>=0&&k<n&&d.s[k]!=null&&own(k)>0;}
     function flush(){if(run.length){var top='',pen=false;
@@ -555,20 +541,17 @@ function chart(){
     for(var k=0;k<n;k++){if(d.s[k]==null)flush();else run.push(k);}flush();
     return p?'<path class="a '+c+'" d="'+p+'"/>'+(q?'<path class="o '+c+'" d="'+q+'"/>':''):'';}
   curD=d;
-  var g='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Solar production and house use" data-cur="o" data-w="'+W+'" data-l="'+L+'" data-pw="'+pw+'" data-n="'+n+'" data-t="'+T+'" data-ph="'+ph+'" data-top="'+top+'">';
+  var g='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Solar production" data-cur="o" data-w="'+W+'" data-l="'+L+'" data-pw="'+pw+'" data-n="'+n+'" data-t="'+T+'" data-ph="'+ph+'" data-top="'+top+'">';
   for(v=0;v<=top+1e-9;v+=st)g+='<line class="gl" x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(v*1000)+'" y2="'+Y(v*1000)+'"/>'+
     '<text x="'+(L-6)+'" y="'+(+Y(v*1000)+4)+'" text-anchor="end">'+(v?f(v,st<1?1:0):'kW')+'</text>';
-  g+=area('cp',P,P)+area('cc',C,C)+area('cf',F,F);
+  g+=area('cp',P,P);
   var hg={s:''};chHours(hg,L,pw,n,d.step,H);g+=hg.s;
   g+='<line class="ax" x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(0)+'" y2="'+Y(0)+'"/>';   // bottom axis
-  if(d.slot>=0){g+='<line class="now" x1="'+X(d.slot)+'" x2="'+X(d.slot)+'" y1="'+T+'" y2="'+Y(0)+'"/>';   // now: line + ring at the house use
-    if(d.s[d.slot]!=null)g+='<circle class="nr" cx="'+X(d.slot)+'" cy="'+Y(C(d.slot))+'" r="3"/>';}
+  if(d.slot>=0){g+='<line class="now" x1="'+X(d.slot)+'" x2="'+X(d.slot)+'" y1="'+T+'" y2="'+Y(0)+'"/>';
+    if(P(d.slot)>0)g+='<circle class="nr" cx="'+X(d.slot)+'" cy="'+Y(P(d.slot))+'" r="3"/>';}
   g+=chMsg(cd.msg,W,H)+'<g class="cur"></g></svg>';
-  var kwh=function(w){return cd.msg?'–':f(w*d.step/60000,1);};      // sum of W per slot -> kWh
-  var lg='<span><i class="cp"></i>Solar production <b>'+kwh(e[0])+' kWh</b></span>'+
-    '<span><i class="cc"></i>Consumption <b>'+kwh(e[1])+' kWh</b></span>'+
-    '<span><i class="cf"></i>From solar and battery <b>'+kwh(e[2])+' kWh</b> ('+(e[1]?Math.round(e[2]*100/e[1]):0)+' %)</span>';
-  if(cd.msg)lg=lg.replace(/ \(\d+ %\)/,'');
+  var kwh=function(w){return cd.msg?'–':f(w*d.step/60000,1);};
+  var lg='<span><i class="cp"></i>Solar production <b>'+kwh(e)+' kWh</b></span>';
   return h+g+'<div class="lgd">'+lg+'</div></section>';
 }
 // ---- Overview, week: 7 days up to wEnd (today by default), from the same 5-minute day data as the day view.
@@ -621,6 +604,99 @@ function weekChart(){
   return h+g+'<div class="lgd">'+lg+'</div></section>';
 }
 // Battery charge level over the day (c = 0.1 %, null = no reading), same day as the chart above
+function consChart(){
+  var cd=chDay(),d=cd.d,h=chHead('Consumption '+dayName(cd.day),cd.iv);
+  var n=d.s.length,W=chWidth(),H=138,L=34,R=8,T=10,B=24,pw=W-L-R,ph=H-T-B,max=0,e=0,i,v;
+  function C(k){return d.s[k]+(d.b&&d.b[k]?d.b[k]:0)+(d.g&&d.g[k]?d.g[k]:0);}
+  for(i=0;i<n;i++){if(d.s[i]==null)continue;max=Math.max(max,C(i));e+=C(i);}
+  var mk=Math.max(max/1000,0.1),st=[0.2,0.4,0.5,1,2,5].filter(function(x){return Math.ceil(mk/x)<=4;})[0]||5;
+  var top=st*Math.ceil(mk/st);
+  function X(i){return (L+(i+0.5)*pw/n).toFixed(1);}
+  function Y(w){return (T+ph-ph*w/(top*1000)).toFixed(1);}
+  function area(c,fn,own){var p='',q='',run=[];
+    function used(k){return k>=0&&k<n&&d.s[k]!=null&&own(k)>0;}
+    function flush(){if(run.length){var top='',pen=false;
+      run.forEach(function(k,j){top+=(j?'L':'M')+X(k)+','+Y(fn(k));
+        if(used(k)||used(k-1)||used(k+1)){q+=(pen?'L':'M')+X(k)+','+Y(fn(k));pen=true;}else pen=false;});
+      p+='M'+X(run[0])+','+Y(0)+'L'+top.slice(1)+'L'+X(run[run.length-1])+','+Y(0)+'Z';}run=[];}
+    for(var k=0;k<n;k++){if(d.s[k]==null)flush();else run.push(k);}flush();
+    return p?'<path class="a '+c+'" d="'+p+'"/>'+(q?'<path class="o '+c+'" d="'+q+'"/>':''):'';}
+  curD=d;
+  var g='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="House consumption" data-cur="c" data-w="'+W+'" data-l="'+L+'" data-pw="'+pw+'" data-n="'+n+'" data-t="'+T+'" data-ph="'+ph+'" data-top="'+top+'">';
+  for(v=0;v<=top+1e-9;v+=st)g+='<line class="gl" x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(v*1000)+'" y2="'+Y(v*1000)+'"/>'+
+    '<text x="'+(L-6)+'" y="'+(+Y(v*1000)+4)+'" text-anchor="end">'+(v?f(v,st<1?1:0):'kW')+'</text>';
+  g+=area('cc',C,C);
+  var hg={s:''};chHours(hg,L,pw,n,d.step,H);g+=hg.s;
+  g+='<line class="ax" x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(0)+'" y2="'+Y(0)+'"/>';
+  if(d.slot>=0){g+='<line class="now" x1="'+X(d.slot)+'" x2="'+X(d.slot)+'" y1="'+T+'" y2="'+Y(0)+'"/>';
+    if(C(d.slot)>0)g+='<circle class="nr" cx="'+X(d.slot)+'" cy="'+Y(C(d.slot))+'" r="3"/>';}
+  g+=chMsg(cd.msg,W,H)+'<g class="cur"></g></svg>';
+  var kwh=function(w){return cd.msg?'–':f(w*d.step/60000,1);};
+  var lg='<span><i class="cc"></i>Consumption <b>'+kwh(e)+' kWh</b></span>';
+  return h+g+'<div class="lgd">'+lg+'</div></section>';
+}
+function impChart(){
+  var cd=chDay(),d=cd.d,h=chHead('Grid Import '+dayName(cd.day),cd.iv);
+  var n=d.s.length,W=chWidth(),H=138,L=34,R=8,T=10,B=24,pw=W-L-R,ph=H-T-B,max=0,e=0,i,v;
+  function G(k){return d.g&&d.g[k]?d.g[k]:0;}
+  for(i=0;i<n;i++){if(d.s[i]==null)continue;max=Math.max(max,G(i));e+=G(i);}
+  var mk=Math.max(max/1000,0.1),st=[0.2,0.4,0.5,1,2,5].filter(function(x){return Math.ceil(mk/x)<=4;})[0]||5;
+  var top=st*Math.ceil(mk/st);
+  function X(i){return (L+(i+0.5)*pw/n).toFixed(1);}
+  function Y(w){return (T+ph-ph*w/(top*1000)).toFixed(1);}
+  function area(c,fn,own){var p='',q='',run=[];
+    function used(k){return k>=0&&k<n&&d.s[k]!=null&&own(k)>0;}
+    function flush(){if(run.length){var top='',pen=false;
+      run.forEach(function(k,j){top+=(j?'L':'M')+X(k)+','+Y(fn(k));
+        if(used(k)||used(k-1)||used(k+1)){q+=(pen?'L':'M')+X(k)+','+Y(fn(k));pen=true;}else pen=false;});
+      p+='M'+X(run[0])+','+Y(0)+'L'+top.slice(1)+'L'+X(run[run.length-1])+','+Y(0)+'Z';}run=[];}
+    for(var k=0;k<n;k++){if(d.s[k]==null)flush();else run.push(k);}flush();
+    return p?'<path class="a '+c+'" d="'+p+'"/>'+(q?'<path class="o '+c+'" d="'+q+'"/>':''):'';}
+  curD=d;
+  var g='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Grid import" data-cur="i" data-w="'+W+'" data-l="'+L+'" data-pw="'+pw+'" data-n="'+n+'" data-t="'+T+'" data-ph="'+ph+'" data-top="'+top+'">';
+  for(v=0;v<=top+1e-9;v+=st)g+='<line class="gl" x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(v*1000)+'" y2="'+Y(v*1000)+'"/>'+
+    '<text x="'+(L-6)+'" y="'+(+Y(v*1000)+4)+'" text-anchor="end">'+(v?f(v,st<1?1:0):'kW')+'</text>';
+  g+=area('cc',G,G);
+  var hg={s:''};chHours(hg,L,pw,n,d.step,H);g+=hg.s;
+  g+='<line class="ax" x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(0)+'" y2="'+Y(0)+'"/>';
+  if(d.slot>=0){g+='<line class="now" x1="'+X(d.slot)+'" x2="'+X(d.slot)+'" y1="'+T+'" y2="'+Y(0)+'"/>';
+    if(G(d.slot)>0)g+='<circle class="nr" cx="'+X(d.slot)+'" cy="'+Y(G(d.slot))+'" r="3"/>';}
+  g+=chMsg(cd.msg,W,H)+'<g class="cur"></g></svg>';
+  var kwh=function(w){return cd.msg?'–':f(w*d.step/60000,1);};
+  var lg='<span><i class="cc"></i>Grid import <b>'+kwh(e)+' kWh</b></span>';
+  return h+g+'<div class="lgd">'+lg+'</div></section>';
+}
+function expChart(){
+  var cd=chDay(),d=cd.d,h=chHead('Grid Export '+dayName(cd.day),cd.iv);
+  var n=d.s.length,W=chWidth(),H=138,L=34,R=8,T=10,B=24,pw=W-L-R,ph=H-T-B,max=0,e=0,i,v;
+  function EX(k){return d.e&&d.e[k]?d.e[k]:0;}
+  for(i=0;i<n;i++){if(d.s[i]==null)continue;max=Math.max(max,EX(i));e+=EX(i);}
+  var mk=Math.max(max/1000,0.1),st=[0.2,0.4,0.5,1,2,5].filter(function(x){return Math.ceil(mk/x)<=4;})[0]||5;
+  var top=st*Math.ceil(mk/st);
+  function X(i){return (L+(i+0.5)*pw/n).toFixed(1);}
+  function Y(w){return (T+ph-ph*w/(top*1000)).toFixed(1);}
+  function area(c,fn,own){var p='',q='',run=[];
+    function used(k){return k>=0&&k<n&&d.s[k]!=null&&own(k)>0;}
+    function flush(){if(run.length){var top='',pen=false;
+      run.forEach(function(k,j){top+=(j?'L':'M')+X(k)+','+Y(fn(k));
+        if(used(k)||used(k-1)||used(k+1)){q+=(pen?'L':'M')+X(k)+','+Y(fn(k));pen=true;}else pen=false;});
+      p+='M'+X(run[0])+','+Y(0)+'L'+top.slice(1)+'L'+X(run[run.length-1])+','+Y(0)+'Z';}run=[];}
+    for(var k=0;k<n;k++){if(d.s[k]==null)flush();else run.push(k);}flush();
+    return p?'<path class="a '+c+'" d="'+p+'"/>'+(q?'<path class="o '+c+'" d="'+q+'"/>':''):'';}
+  curD=d;
+  var g='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Grid export" data-cur="e" data-w="'+W+'" data-l="'+L+'" data-pw="'+pw+'" data-n="'+n+'" data-t="'+T+'" data-ph="'+ph+'" data-top="'+top+'">';
+  for(v=0;v<=top+1e-9;v+=st)g+='<line class="gl" x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(v*1000)+'" y2="'+Y(v*1000)+'"/>'+
+    '<text x="'+(L-6)+'" y="'+(+Y(v*1000)+4)+'" text-anchor="end">'+(v?f(v,st<1?1:0):'kW')+'</text>';
+  g+=area('cp',EX,EX);
+  var hg={s:''};chHours(hg,L,pw,n,d.step,H);g+=hg.s;
+  g+='<line class="ax" x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(0)+'" y2="'+Y(0)+'"/>';
+  if(d.slot>=0){g+='<line class="now" x1="'+X(d.slot)+'" x2="'+X(d.slot)+'" y1="'+T+'" y2="'+Y(0)+'"/>';
+    if(EX(d.slot)>0)g+='<circle class="nr" cx="'+X(d.slot)+'" cy="'+Y(EX(d.slot))+'" r="3"/>';}
+  g+=chMsg(cd.msg,W,H)+'<g class="cur"></g></svg>';
+  var kwh=function(w){return cd.msg?'–':f(w*d.step/60000,1);};
+  var lg='<span><i class="cp"></i>Grid export <b>'+kwh(e)+' kWh</b></span>';
+  return h+g+'<div class="lgd">'+lg+'</div></section>';
+}
 function batChart(){
   var cd=chDay(),d=cd.d,h=chHead('Battery '+dayName(cd.day),cd.iv);
   var c=d.c||[],n=d.s.length,W=chWidth(),H=138,L=34,R=8,T=10,B=24,pw=W-L-R,ph=H-T-B,lo=null,hi=null,i,v;
@@ -642,7 +718,7 @@ function batChart(){
   var hg={s:''};chHours(hg,L,pw,n,d.step,H);g+=hg.s;
   g+='<line class="ax" x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(0)+'" y2="'+Y(0)+'"/>';
   var now=d.slot>=0?V(d.slot):null,last=null;
-  for(i=n-1;i>=0&&last==null;i--)last=V(i);                 // old day: level at the end of the day
+  for(i=n-1;i>=0&&last==null;i--)last=V(i);
   if(d.slot>=0){g+='<line class="now" x1="'+X(d.slot)+'" x2="'+X(d.slot)+'" y1="'+T+'" y2="'+Y(0)+'"/>';
     if(now!=null)g+='<circle class="nr bt" cx="'+X(d.slot)+'" cy="'+Y(now)+'" r="3"/>';}
   g+=chMsg(cd.msg,W,H)+'<g class="cur"></g></svg>';
@@ -651,7 +727,7 @@ function batChart(){
     '<span>Lowest <b>'+pc(lo)+'</b></span><span>Highest <b>'+pc(hi)+'</b></span>';
   return h+g+'<div class="lgd">'+lg+'</div></section>';
 }
-if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener('resize',function(){if(lastData&&(showChart||showBatChart))render(lastData);});
+if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener('resize',function(){if(lastData&&showChart)render(lastData);});
 // Cursor on both charts: move the mouse or a finger over a chart to see the time and the values of that
 // 5 minutes (both charts show the same moment). Mouse: gone when it leaves the chart; touch: stays until
 // you tap somewhere else. hSel = slot (null = no cursor); curD = the day the charts show.
@@ -667,13 +743,25 @@ function curDraw(){
     if(wk){var w=curW[k].t;
       if(w)rows=[['Production',f(w.p,1)+' kWh','cp'],['Consumption',f(w.c,1)+' kWh','cc'],['Solar + battery',f(w.f,1)+' kWh','cf']];}
     else if(o){var top=+ds.top*1000;
-      if(d.s[k]!=null){var P=d.p&&d.p[k]!=null?d.p[k]:0,C=d.s[k]+d.b[k]+d.g[k],F=d.s[k]+d.b[k];
-        rows=[['Production',P,'cp'],['Consumption',C,'cc'],['Solar + battery',F,'cf']].map(function(r){
+      if(d.s[k]!=null){var P=d.p&&d.p[k]!=null?d.p[k]:0;
+        rows=[['Production',P,'cp']].map(function(r){
+          v+='<circle class="cd '+r[2]+'" cx="'+x.toFixed(1)+'" cy="'+Y(r[1]/top).toFixed(1)+'" r="3"/>';return [r[0],f(r[1]/1000,2)+' kW',r[2]];});}}
+    else if(ds.cur==='c'){var top=+ds.top*1000;
+      if(d.s[k]!=null){var C=d.s[k]+(d.b&&d.b[k]?d.b[k]:0)+(d.g&&d.g[k]?d.g[k]:0);
+        rows=[['Consumption',C,'cc']].map(function(r){
+          v+='<circle class="cd '+r[2]+'" cx="'+x.toFixed(1)+'" cy="'+Y(r[1]/top).toFixed(1)+'" r="3"/>';return [r[0],f(r[1]/1000,2)+' kW',r[2]];});}}
+    else if(ds.cur==='i'){var top=+ds.top*1000;
+      if(d.s[k]!=null){var G=d.g&&d.g[k]?d.g[k]:0;
+        rows=[['Import',G,'cc']].map(function(r){
+          v+='<circle class="cd '+r[2]+'" cx="'+x.toFixed(1)+'" cy="'+Y(r[1]/top).toFixed(1)+'" r="3"/>';return [r[0],f(r[1]/1000,2)+' kW',r[2]];});}}
+    else if(ds.cur==='e'){var top=+ds.top*1000;
+      if(d.s[k]!=null){var EX=d.e&&d.e[k]?d.e[k]:0;
+        rows=[['Export',EX,'cp']].map(function(r){
           v+='<circle class="cd '+r[2]+'" cx="'+x.toFixed(1)+'" cy="'+Y(r[1]/top).toFixed(1)+'" r="3"/>';return [r[0],f(r[1]/1000,2)+' kW',r[2]];});}}
     else{var c=d.c&&d.c[k]!=null?d.c[k]/10:null;
       if(c!=null){v+='<circle class="cd cf" cx="'+x.toFixed(1)+'" cy="'+Y(c/100).toFixed(1)+'" r="3"/>';rows=[['Battery',Math.round(c)+' %','cf']];}}
     if(!rows.length)rows=[[wk?'No data':'No reading','','']];
-    var bw=o||wk?138:78,lh=12,bh=7+lh*(rows.length+1),bx=x+7+bw<=W-4?x+7:x-7-bw;bx=Math.max(2,Math.min(W-4-bw,bx));   // beside the line, always inside the chart
+    var bw=o||wk?138:78,lh=12,bh=7+lh*(rows.length+1),bx=x+7+bw<=W-4?x+7:x-7-bw;bx=Math.max(2,Math.min(W-4-bw,bx));
     var t='<line x1="'+x.toFixed(1)+'" x2="'+x.toFixed(1)+'" y1="'+T+'" y2="'+(T+ph)+'"/>'+v+
       '<rect class="bx" x="'+bx.toFixed(1)+'" y="'+T+'" width="'+bw+'" height="'+bh+'" rx="4.5"/>'+
       '<text class="ct" x="'+(bx+6).toFixed(1)+'" y="'+(T+13)+'"><tspan class="tb">'+tm+'</tspan></text>';
@@ -695,13 +783,13 @@ function card(t,body){return '<section class="card"><h2>'+t+'</h2>'+body+'</sect
 function render(d){
   lastData=d;
   var s=d.summary||{},h='';
-  // order: power flow, charts, Production & consumption, details (each switched on the setup page, Monitor);
-  // the Overview chart shows a day or a week (Day / Week switch in its header)
   if(showFlow){wxCheck(d);h+=flow(s);}
   if(showChart)h+=ovWeek?weekChart():chart();
-  if(showBatChart)h+=batChart();
-  if(showPC)h+=pcCard(s);
-  if((showChart||showBatChart||showPC)&&Date.now()-histAt>60000)loadHist();   // chart data refreshed every minute
+  h+=consChart();
+  if(showImportChart)h+=impChart();
+  if(showExportChart)h+=expChart();
+  h+=batChart();
+  if((showChart||showImportChart||showExportChart)&&Date.now()-histAt>60000)loadHist();
   if(showDetails){
   h+='<div class="cards">';
   (d.inverters||[]).forEach(function(o){h+=card('Inverter (unit '+o.unit+')',o.ok===false?'<p class="err">No data</p>':rows(INV,o));});
