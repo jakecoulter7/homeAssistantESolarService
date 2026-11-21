@@ -1,4 +1,4 @@
-/*
+wor/*
   esolard: eSolar monitor for a SolarEdge system (Modbus TCP, SunSpec) on Linux.
   Polls the leader inverter and serves:
       http://<linux-ip>/              the animated dashboard (power flow, charts, Production & consumption)
