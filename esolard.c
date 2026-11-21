@@ -805,9 +805,9 @@ static void updateDaily(const double* raw) {
 
 // ---------------------------------------------------------------------------
 // Usage chart (/history): today's house use per 5 minutes split by source
-// (from solar / battery / grid import, W), solar production (W), battery charge level (0.1 %), and grid export (W).
+// (from solar / battery / grid, W), solar production, battery charge, and grid import/export.
 // Today: RAM + a copy in <dataDir>/hist-today.bin every 30 minutes, at a restart and at stop.
-// Finished days: <dataDir>/hist/yyyymmdd.bin (3456 bytes: the 6 series of 288 slots, 0xFFFF = empty),
+// Finished days: <dataDir>/hist/yyyymmdd.bin (0xFFFF = no reading).
 // the last histKeepDays days.
 // ---------------------------------------------------------------------------
 #ifndef HIST_STEP_MIN
@@ -819,16 +819,20 @@ static void updateDaily(const double* raw) {
 typedef struct {
     uint16_t s[HIST_SLOTS];      // from solar (W)
     uint16_t b[HIST_SLOTS];      // from battery (W)
-    uint16_t g[HIST_SLOTS];      // from grid: import (W)
+    uint16_t g[HIST_SLOTS];      // from grid (W)
     uint16_t p[HIST_SLOTS];      // solar production (W)
     uint16_t c[HIST_SLOTS];      // battery charge level (0.1 %)
-    uint16_t e[HIST_SLOTS];      // exported to grid (W)
+    uint16_t i[HIST_SLOTS];      // total grid import (W)
+    uint16_t e[HIST_SLOTS];      // total grid export (W)
 } HistData;
+
+#define HIST_LEGACY_SIZE (5 * HIST_SLOTS * sizeof(uint16_t))
 
 static HistData hist;            // protected by dataMutex
 static int      histDay = 0, histSlot = -1;
 static double   histSum[4] = { 0, 0, 0, 0 };
-static double   histImportSum = 0, histExportSum = 0;  // grid split: import (W) and export (W)
+static double   histImportSum = 0, histExportSum = 0;
+static int      histGridCount = 0;
 static int      histCount = 0;
 static double   histSocSum = 0;
 static int      histSocCount = 0;
@@ -852,6 +856,18 @@ static bool writeAtomic(const char* path, const void* a, size_t na, const void* 
     return true;
 }
 
+static bool histRead(FILE* f, HistData* h) {
+    memset(h, 0xFF, sizeof(*h));
+    if (fread(h, 1, HIST_LEGACY_SIZE, f) != HIST_LEGACY_SIZE) return false;
+    size_t n = fread(h->i, 1, sizeof(h->i) + sizeof(h->e), f);
+    if (ferror(f) || (n != 0 && n != sizeof(h->i) && n != sizeof(h->i) + sizeof(h->e)) || fgetc(f) != EOF) return false;
+    if (n == sizeof(h->i)) {
+        memcpy(h->e, h->i, sizeof(h->e));
+        memset(h->i, 0xFF, sizeof(h->i));
+    }
+    return true;
+}
+
 static void histLoad(void) {                       // at start: today's curve (dropped later if it is an old day)
     histClear();
     char path[600];
@@ -860,7 +876,8 @@ static void histLoad(void) {                       // at start: today's curve (d
     if (!f) return;
     int32_t day;
     HistData h;
-    if (fread(&day, 4, 1, f) == 1 && fread(&h, sizeof(h), 1, f) == 1) { hist = h; histDay = day; }
+    if (fread(&day, 4, 1, f) == 1 && histRead(f, &h)) { hist = h; histDay = day; }
+    else Log("Chart: invalid history file %s", path);
     fclose(f);
     if (histDay) Log("Chart: day %d loaded from %s", histDay, path);
 }
@@ -907,8 +924,9 @@ static bool histReadDay(int day, HistData* h) {
     histPath(path, sizeof(path), day);
     FILE* f = fopen(path, "rb");
     if (!f) return false;
-    bool ok = fread(h, sizeof(*h), 1, f) == 1 && fgetc(f) == EOF;
+    bool ok = histRead(f, h);
     fclose(f);
+    if (!ok) Log("Chart: invalid history file %s", path);
     return ok;
 }
 
@@ -938,7 +956,7 @@ static uint16_t histW(double w) {
     return w > 65534.0 ? 65534 : (uint16_t)lround(w);
 }
 
-static void histAdd(double solarW, double batW, double gridW, double prodW, double socPct, const double* volts) {
+static void histAdd(double solarW, double batW, double fromGridW, double gridW, double prodW, double socPct, const double* volts) {
     time_t now = time(NULL);
     struct tm t;
     localtime_r(&now, &t);
@@ -968,18 +986,19 @@ static void histAdd(double solarW, double batW, double gridW, double prodW, doub
         for (int k = 0; k < 3; k++) { histVSum[k] = 0; histVCount[k] = 0; }
         histSum[0] = histSum[1] = histSum[2] = histSum[3] = 0;
         histImportSum = histExportSum = 0;
+        histGridCount = 0;
         histSocSum = 0;
         histSocCount = 0;
         histCount = 0;
     }
     histSum[0] += solarW;
     histSum[1] += batW;
+    histSum[2] += fromGridW;
     histSum[3] += isnan(prodW) ? 0 : prodW;
-    // Split grid into import (negative) and export (positive)
-    // gridW: + export, - import (based on METER_POSITIVE_IS_EXPORT = true)
     if (!isnan(gridW)) {
-        if (gridW > 0) histExportSum += gridW;
-        else if (gridW < 0) histImportSum += -gridW;
+        histImportSum += gridW < 0 ? -gridW : 0;
+        histExportSum += gridW > 0 ? gridW : 0;
+        histGridCount++;
     }
     histCount++;
     if (!isnan(socPct) && socPct >= 0 && socPct <= 100) { histSocSum += socPct; histSocCount++; }
@@ -987,10 +1006,11 @@ static void histAdd(double solarW, double batW, double gridW, double prodW, doub
         if (volts && !isnan(volts[k]) && volts[k] > 50.0 && volts[k] < 999.0) { histVSum[k] += volts[k]; histVCount[k]++; }
     hist.s[slot] = histW(histSum[0] / histCount);
     hist.b[slot] = histW(histSum[1] / histCount);
-    hist.g[slot] = histW(histImportSum / histCount);
-    hist.e[slot] = histW(histExportSum / histCount);
+    hist.g[slot] = histW(histSum[2] / histCount);
     hist.p[slot] = histW(histSum[3] / histCount);
     hist.c[slot] = histSocCount ? (uint16_t)lround(histSocSum / histSocCount * 10.0) : HIST_NONE;
+    hist.i[slot] = histGridCount ? histW(histImportSum / histGridCount) : HIST_NONE;
+    hist.e[slot] = histGridCount ? histW(histExportSum / histGridCount) : HIST_NONE;
     pthread_mutex_unlock(&dataMutex);
     if (archiveDay) histArchive(archiveDay, &prev);
     if (save) histSave();
@@ -1004,7 +1024,7 @@ static void histReading(double houseW, double gridW, double batW, double prodW, 
     if (fromGrid > house) fromGrid = house;
     double fromBat = (!isnan(batW) && batW < 0) ? -batW : 0;       // batW: + charge, - discharge
     if (fromBat > house - fromGrid) fromBat = house - fromGrid;
-    histAdd(house - fromGrid - fromBat, fromBat, fromGrid, prodW, socPct, volts);
+    histAdd(house - fromGrid - fromBat, fromBat, fromGrid, gridW, prodW, socPct, volts);
 }
 
 // Same sums as the dashboard's Production & consumption card: to home = house use from solar,
@@ -2039,7 +2059,7 @@ static void handleRoot(int fd, bool local, bool head) {
         "<circle class=\"tr\" cx=\"12\" cy=\"12\" r=\"10\"/><circle class=\"tp\" cx=\"12\" cy=\"12\" r=\"10\"/></svg>"
         "<b id=\"tickn\"></b></span>",
         "ver " ESOLARD_VERSION " (c) WOEPER<span id=\"age\">loading&hellip;</span>",
-        local ? "<a class=\"ghost\" href=\"/config\">Setup</a>" : NULL);   // Setup only on the local network
+        local ? "<a class=\"ghost\" href=\"/config\">Setup</a>" : NULL);
     sbPut(&o, INDEX_HTML);
     replyN(fd, 200, "text/html; charset=utf-8", o.p, o.n, NULL, head);
     sbFree(&o);
@@ -2059,11 +2079,12 @@ static void handleConfig(int fd, bool head) {
     sOpen(&o, "monitor", "Monitor", "These act at once, no need to save.");
     mSwitch(&o, "Power flow", "Picture at the top of the dashboard: sun, house, grid and battery, with moving arrows where power flows now. On by default. Remembered in this browser.", "m_flow", false);
     mSwitch(&o, "Garden", "The fence, the grass and the flowers around the house in the power flow picture. On by default. Remembered in this browser.", "m_garden", false);
-    snprintf(t, sizeof(t), "Solar production, house use and the part of it from solar and battery, per 5 minutes, just under the power flow picture. "
+    snprintf(t, sizeof(t), "Solar production and house consumption per 5 minutes, just under the power flow picture. "
         "Today and up to %u days before (arrows on the chart). On by default. Remembered in this browser.", histKeepDays);
-    mSwitch(&o, "Production &amp; consumption chart", t, "m_chart", false);
+    mSwitch(&o, "Solar production and consumption charts", t, "m_chart", false);
     mSwitch(&o, "Battery chart", "Battery charge level per 5 minutes, under the production and consumption chart. On by default. Remembered in this browser.", "m_bchart", false);
-    mSwitch(&o, "Production &amp; consumption", "Today's solar production split into home, battery and grid, and the house use split into solar, battery and grid, with rings and bars. On by default. Remembered in this browser.", "m_pc", false);
+    mSwitch(&o, "Import chart", "Total power imported from the grid. On by default. Remembered in this browser.", "m_imp", false);
+    mSwitch(&o, "Export chart", "Total power exported to the grid. On by default. Remembered in this browser.", "m_exp", false);
     mSwitch(&o, "Details", "Inverter, meter and battery tables on the dashboard. Remembered in this browser.", "m_det", false);
     sbPut(&o, "</section>");
 
@@ -2144,7 +2165,7 @@ static void handleConfig(int fd, bool head) {
     sbFree(&o);
 }
 
-// Usage chart data: {"day":yyyymmdd,"step":5,"slot":n,"s":[..],"b":[..],"g":[..],"p":[..],"c":[..],"days":[..]}
+// Usage chart data includes total grid import (i) and export (e), in watts.
 static void handleHistory(int fd, const char* query, bool head) {
     HistData copy;
     int day, slot, today;
@@ -2162,9 +2183,9 @@ static void handleHistory(int fd, const char* query, bool head) {
     }
     Sb o = { 0 };
     sbPrintf(&o, "{\"day\":%d,\"step\":%d,\"slot\":%d", day, HIST_STEP_MIN, slot);
-    const uint16_t* arr[6] = { copy.s, copy.b, copy.g, copy.p, copy.c, copy.e };
-    const char* key[6] = { "s", "b", "g", "p", "c", "e" };
-    for (int k = 0; k < 6; k++) {
+    const uint16_t* arr[7] = { copy.s, copy.b, copy.g, copy.p, copy.c, copy.i, copy.e };
+    const char* key[7] = { "s", "b", "g", "p", "c", "i", "e" };
+    for (int k = 0; k < 7; k++) {
         sbPrintf(&o, ",\"%s\":[", key[k]);
         for (int i = 0; i < HIST_SLOTS; i++) {
             if (i) sbPutc(&o, ',');

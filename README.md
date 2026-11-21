@@ -39,17 +39,15 @@ The program is one C file with no external libraries: only GCC is needed.
 solar production (kW), use in the house, power to or from the grid, and the battery level and whether it
 is charging or discharging. Top left is today's production; top right is the weather (or the moon at night).
 
-**Overview chart**: solar production, house use and the part of the house use that came from solar and
-battery, in 5-minute steps. Use **Day / Week** to switch between one day and a week of daily totals, and the
-‹ › arrows to go back in time (a year of days is kept by default).
+**Charts**: solar production, house consumption, grid import, grid export and battery level in 5-minute
+steps. Use **Day / Week** on the production chart to switch between one day and a week of daily totals, and
+the ‹ › arrows to go back in time (a year of days is kept by default). The power-flow production total uses
+the same recorded solar history as today's production chart.
 
 <img width="1236" height="772" alt="image" src="https://github.com/user-attachments/assets/5e7a6ad6-84cc-4246-9674-65064679c604" />
 
 
 **Battery chart**: the battery level over the day, with the lowest and highest level.
-
-**Production & consumption**: today's production split into *to home / to battery / to grid*, and the house
-use split into *from solar / from battery / from grid*, with bars and rings.
 
 **Details** (off by default): tables with every inverter, meter and battery value.
 
@@ -110,6 +108,11 @@ Wait until Docker's Linux engine is running before building. A successful
 compile alone does not verify the full Docker image build. For failed Home
 Assistant updates, inspect **Settings > System > Logs > Supervisor**, not
 the app's runtime log, for the image build error.
+
+The app dashboard shows solar production, consumption, grid import, grid
+export and battery level. Import and export are recorded separately from
+version 0.0.33 onward; earlier history is preserved, but those two readings
+cannot be reconstructed for older slots.
 
 ### Standalone Linux service
 
