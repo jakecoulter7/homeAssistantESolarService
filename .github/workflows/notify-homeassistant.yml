@@ -9,22 +9,22 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
-      - name: Refresh Home Assistant Addon Repositories
+      - name: Reload addon store to check for updates
         run: |
           curl -X POST \
             -H "Authorization: Bearer ${{ secrets.HA_TOKEN }}" \
             -H "Content-Type: application/json" \
             https://ha.glebeha.uk/api/hassio/addon_store/reload
       
-      - name: Wait for refresh
-        run: sleep 3
+      - name: Wait for store reload
+        run: sleep 5
       
-      - name: Check for addon updates
+      - name: Refresh addon list
         run: |
           curl -X POST \
             -H "Authorization: Bearer ${{ secrets.HA_TOKEN }}" \
             -H "Content-Type: application/json" \
-            https://ha.glebeha.uk/api/hassio/update_check
+            https://ha.glebeha.uk/api/hassio/addons/reload
       
       - name: Wait before update
         run: sleep 2
