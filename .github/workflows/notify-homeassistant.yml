@@ -9,25 +9,15 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
-      - name: Reload addon store to check for updates
+      - name: Reload app store to check for updates
         run: |
           curl -X POST \
             -H "Authorization: Bearer ${{ secrets.HA_TOKEN }}" \
             -H "Content-Type: application/json" \
-            https://ha.glebeha.uk/api/hassio/addon_store/reload
+            https://ha.glebeha.uk/api/hassio/store/reload
       
       - name: Wait for store reload
         run: sleep 5
-      
-      - name: Refresh addon list
-        run: |
-          curl -X POST \
-            -H "Authorization: Bearer ${{ secrets.HA_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            https://ha.glebeha.uk/api/hassio/addons/reload
-      
-      - name: Wait before update
-        run: sleep 2
       
       - name: Update eSolarService addon
         run: |
