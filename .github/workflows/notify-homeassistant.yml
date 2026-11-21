@@ -9,10 +9,17 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger Home Assistant update webhook
+      - name: Trigger Home Assistant update webhook (with retries)
         run: |
-          curl -X POST \
-            -H "Content-Type: application/json" \
-            http://192.168.68.125:8123/api/webhook/${{ secrets.HA_WEBHOOK_ID }} \
-            -d '{"action":"update_esolarservice"}'
+          for i in {1..3}; do
+            echo "Attempt $i..."
+            curl -v -X POST \
+              -H "Content-Type: application/json" \
+              -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
+              -H "Accept: */*" \
+              -H "Accept-Language: en-US,en;q=0.9" \
+              -H "Cache-Control: no-cache" \
+              https://ha.glebeha.uk/api/webhook/${{ secrets.HA_WEBHOOK_ID }} \
+              -d '{"action":"update_esolarservice"}' && break || sleep 5
+          done
         continue-on-error: true
