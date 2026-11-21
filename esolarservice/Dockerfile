@@ -6,7 +6,8 @@ RUN apk add --no-cache \
     musl-dev \
     make \
     jq \
-    tzdata
+    tzdata \
+    linux-headers
 
 WORKDIR /app
 
