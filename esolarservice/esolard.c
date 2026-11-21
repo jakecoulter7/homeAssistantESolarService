@@ -1,4 +1,4 @@
-wor/*
+/*
   esolard: eSolar monitor for a SolarEdge system (Modbus TCP, SunSpec) on Linux.
   Polls the leader inverter and serves:
       http://<linux-ip>/              the animated dashboard (power flow, charts, Production & consumption)
@@ -2030,7 +2030,7 @@ static void handleRoot(int fd, bool local, bool head) {
         "<circle class=\"tr\" cx=\"12\" cy=\"12\" r=\"10\"/><circle class=\"tp\" cx=\"12\" cy=\"12\" r=\"10\"/></svg>"
         "<b id=\"tickn\"></b></span>",
         "ver " ESOLARD_VERSION " (c) WOEPER<span id=\"age\">loading&hellip;</span>",
-        local ? "<a class=\"ghost\" href=\"/config\">Setup</a>" : NULL
+        local ? "<a class=\"ghost\" href=\"/config\">Setup</a>" : NULL);
     sbPut(&o, INDEX_HTML);
     replyN(fd, 200, "text/html; charset=utf-8", o.p, o.n, NULL, head);
     sbFree(&o);

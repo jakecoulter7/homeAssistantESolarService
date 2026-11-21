@@ -84,6 +84,35 @@ Change it to match your installation (unit ID, number of meters, battery yes/no)
 
 ## Build and install
 
+### Home Assistant app: local Docker build on Windows
+
+The app is built from the files in `esolarservice`, not the repository-root
+copies. To check the ARM64 image locally, install Docker Desktop and enable
+its WSL 2 based engine.
+
+If WSL is disabled, run in PowerShell as Administrator:
+
+```powershell
+wsl --install --no-distribution
+wsl --update
+```
+
+Restart Windows, start Docker Desktop, and enable **Settings > General >
+Use the WSL 2 based engine**. Hardware virtualization must be enabled in
+BIOS/UEFI. From the repository directory, run:
+
+```powershell
+docker info
+docker build --progress=plain --platform linux/arm64 -t esolarservice-local .\esolarservice
+```
+
+Wait until Docker's Linux engine is running before building. A successful
+compile alone does not verify the full Docker image build. For failed Home
+Assistant updates, inspect **Settings > System > Logs > Supervisor**, not
+the app's runtime log, for the image build error.
+
+### Standalone Linux service
+
 Put all files in one folder (`esolard.c`, `WebPages.h`, `icon.h`, `Makefile`,
 `esolard.service`, `esolard.conf`) and run:
 
