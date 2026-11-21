@@ -17,7 +17,7 @@ jobs:
             https://ha.glebeha.uk/api/hassio/addon_store/reload
       
       - name: Wait for refresh
-        run: sleep 2
+        run: sleep 3
       
       - name: Check for addon updates
         run: |
@@ -25,3 +25,13 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.HA_TOKEN }}" \
             -H "Content-Type: application/json" \
             https://ha.glebeha.uk/api/hassio/update_check
+      
+      - name: Wait before update
+        run: sleep 2
+      
+      - name: Update eSolarService addon
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.HA_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            https://ha.glebeha.uk/api/hassio/addons/esolarservice/update
