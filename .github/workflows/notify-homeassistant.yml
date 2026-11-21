@@ -34,4 +34,4 @@ jobs:
           curl -X POST \
             -H "Authorization: Bearer ${{ secrets.HA_TOKEN }}" \
             -H "Content-Type: application/json" \
-            https://ha.glebeha.uk/api/hassio/addons/esolarservice/update
+            https://ha.glebeha.uk/api/hassio/addons/62b0af83_esolarservice/update
