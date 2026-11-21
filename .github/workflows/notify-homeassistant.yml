@@ -14,4 +14,4 @@ jobs:
           curl -X POST \
             -H "Authorization: Bearer ${{ secrets.HA_TOKEN }}" \
             -H "Content-Type: application/json" \
-            https://192.168.68.125:8123/api/hassio/addon_store/reload
+            https://ha.glebeha.uk/api/hassio/addon_store/reload
