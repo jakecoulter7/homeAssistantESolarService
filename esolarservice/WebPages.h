@@ -231,7 +231,7 @@ td:last-child{text-align:right;font-variant-numeric:tabular-nums}
 .chart .hb{width:32px;height:28px;border-radius:8px;border:1px solid var(--line);background:var(--surf);color:var(--ink);font-size:20px;line-height:1;padding:0 0 3px;cursor:pointer;font-family:inherit}
 .chart .hb:disabled{opacity:.3;cursor:default}
 .chart .seg{display:inline-flex;flex:none;border:1px solid var(--line);border-radius:8px;overflow:hidden}
-.chart .seg button{border:0;background:var(--surf);color:var(--mut);font:inherit;font-size:13px;height:26px;padding:0 9px;cursor:pointer}
+.chart .seg button{border:0;background:var(--surf);color:var(--mut);font:inherit;font-size:12px;height:26px;padding:0 5px;cursor:pointer}
 .chart .seg button+button{border-left:1px solid var(--line)}
 .chart .seg button.on{background:var(--ink);color:var(--surf);font-weight:600}
 .chart rect.wb{fill-opacity:.35;stroke-width:1.2}
@@ -242,7 +242,7 @@ td:last-child{text-align:right;font-variant-numeric:tabular-nums}
 .chart svg[data-cur]{touch-action:pan-y;cursor:crosshair;-webkit-user-select:none;user-select:none}
 .chart .cur{pointer-events:none}.chart .cur line{stroke:var(--ink);stroke-width:1;stroke-dasharray:3 3}
 .chart .cur .cd{stroke:var(--surf);stroke-width:1}.chart .cur .bx{fill:var(--surf);stroke:var(--line);opacity:.96}
-.chart .cur text.ct{fill:var(--ink);font-size:9px}.chart .cur .tb{font-weight:700}
+.chart .cur text.ct{fill:var(--ink);font-size:16px}.chart .cur .tb{font-weight:700}
 .chart .cur .cp{fill:var(--pos)}.chart .cur .cc{fill:var(--sun)}.chart .cur .cf{fill:var(--bat)}
 .lgd{display:flex;flex-wrap:wrap;gap:6px 20px;margin-top:8px;font-size:13px;color:var(--mut)}
 .lgd b{color:var(--ink);font-weight:600}
@@ -496,13 +496,14 @@ function chHead2(t,pOk,nOk,fn,what,seg){return '<section class="card chart" styl
     ' aria-label="Previous '+what+'">&#8249;</button>'+(seg||'<div class="l">'+t+'</div>')+
     '<button class="hb" onclick="'+fn+'(1)"'+(nOk?'':' disabled')+' aria-label="Next '+what+'">&#8250;</button></div>'+(seg?'<div class="l cht">'+t+'</div>':'');}
 function chHead(t,iv,seg){return chHead2(t,iv>0,!!hView,'hStep','day',seg);}
-// Overview: Day (5-minute curve) or Week (one bar group per day), remembered in this browser
-var ovWeek=false,wEnd=0,curW=null;                      // wEnd: last day of the week shown (yyyymmdd), 0 = up to today
-try{ovWeek=localStorage.getItem('ovMode')==='w';}catch(e){}
+// Overview period is remembered in this browser.
+var ovPeriod='d',wEnd=0,curW=null,monthView=0,yearView=0,summaryYears={};
+try{var savedPeriod=localStorage.getItem('ovMode');if(['d','w','m','y'].indexOf(savedPeriod)>=0)ovPeriod=savedPeriod;}catch(e){}
 function ovSeg(){return '<span class="seg" role="group" aria-label="Overview period">'+
-    '<button type="button" class="'+(ovWeek?'':'on')+'" aria-pressed="'+!ovWeek+'" onclick="ovMode(0)">Day</button>'+
-    '<button type="button" class="'+(ovWeek?'on':'')+'" aria-pressed="'+ovWeek+'" onclick="ovMode(1)">Week</button></span>';}
-function ovMode(w){ovWeek=!!w;try{localStorage.setItem('ovMode',w?'w':'d');}catch(e){}hSel=null;if(lastData)render(lastData);}
+    [['d','Day'],['w','Week'],['m','Month'],['y','Year']].map(function(a){
+      return '<button type="button" class="'+(ovPeriod===a[0]?'on':'')+'" aria-pressed="'+(ovPeriod===a[0])+'" onclick="ovMode(\''+a[0]+'\')">'+a[1]+'</button>';
+    }).join('')+'</span>';}
+function ovMode(p){ovPeriod=p;try{localStorage.setItem('ovMode',p);}catch(e){}hSel=null;if(lastData)render(lastData);}
 function chWidth(){var app=document.getElementById('app');return Math.max(260,Math.round(app&&app.clientWidth?app.clientWidth-70:600));}
 function chHours(g,L,pw,n,step,H){[[6,'6'],[12,'Noon'],[18,'18']].forEach(function(a){var x=(L+a[0]*60/step*pw/n).toFixed(1);
     g.s+='<text x="'+x+'" y="'+(H-6)+'" text-anchor="middle">'+a[1]+'</text>';});}
@@ -579,34 +580,90 @@ function dayTot(n){var d;
   for(var i=0;i<d.s.length;i++){if(d.s[i]==null)continue;any=true;
     p+=d.p&&d.p[i]!=null?d.p[i]:0;c+=d.s[i]+d.b[i]+d.g[i];fs+=d.s[i]+d.b[i];}
   return any?{p:p*k,c:c*k,f:fs*k}:null;}
-function weekChart(){
-  var t=todayKey(),e=wEnd||t,days=[],i,v;
-  for(i=6;i>=0;i--)days.push(addDays(e,-i));
-  var TT=days.map(dayTot),loading=TT.some(function(x){return x===false;}),some=TT.some(function(x){return !!x;});
-  var d0=dDate(days[0]),d1=dDate(e);
-  var tl='Overview '+d0.getDate()+(d0.getMonth()!==d1.getMonth()?' '+MON[d0.getMonth()]:'')+' \u2013 '+d1.getDate()+' '+MON[d1.getMonth()];
-  var h=chHead2(tl,wHasBefore(e),!!wEnd,'wStep','week',ovSeg());
-  var n=7,W=chWidth(),H=138,L=34,R=8,T=10,B=24,pw=W-L-R,ph=H-T-B,max=0,sum=[0,0,0];
-  TT.forEach(function(x){if(x){max=Math.max(max,x.p,x.c);sum[0]+=x.p;sum[1]+=x.c;sum[2]+=x.f;}});
-  var mk=Math.max(max,1),st=[1,2,5,10,20,50,100].filter(function(x){return Math.ceil(mk/x)<=4;})[0]||100,top=st*Math.ceil(mk/st);
+function overviewBars(items,title,prev,next,step,period,msg,partial){
+  var h=chHead2(title,prev,next,step,period,ovSeg()),n=items.length,W=chWidth(),
+    H=138,L=period==='year'?58:34,R=8,T=10,B=24,pw=W-L-R,ph=H-T-B,max=0,sum=[0,0,0],v;
+  var some=items.some(function(x){return !!x.t;});
+  items.forEach(function(item){var x=item.t;if(x){max=Math.max(max,x.p,x.c);sum[0]+=x.p;sum[1]+=x.c;sum[2]+=x.f;}});
+  var mk=Math.max(max,1),unit=Math.pow(10,Math.floor(Math.log(Math.max(mk/4,1))/Math.LN10));
+  var st=[1,2,5,10].map(function(x){return x*unit;}).filter(function(x){return Math.ceil(mk/x)<=4;})[0],top=st*Math.ceil(mk/st);
   function Y(k){return T+ph-ph*k/top;}
   var gw=pw/n,bw=Math.min(gw*0.34,40);
   function bar(x,k,c,w){if(!(k>0))return '';var y=Y(k);
     return '<rect class="wb '+c+'" x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+(w||bw).toFixed(1)+'" height="'+(T+ph-y).toFixed(1)+'" rx="1.5"/>';}
-  var g='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Solar production and house use per day" data-cur="w" data-w="'+W+'" data-l="'+L+'" data-pw="'+pw+'" data-n="'+n+'" data-t="'+T+'" data-ph="'+ph+'">';
+  var g='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Solar production and house use per '+(period==='year'?'month':'day')+'" data-cur="w" data-w="'+W+'" data-l="'+L+'" data-pw="'+pw+'" data-n="'+n+'" data-t="'+T+'" data-ph="'+ph+'">';
   for(v=0;v<=top+1e-9;v+=st)g+='<line class="gl" x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(v).toFixed(1)+'" y2="'+Y(v).toFixed(1)+'"/>'+
     '<text x="'+(L-6)+'" y="'+(Y(v)+4).toFixed(1)+'" text-anchor="end">'+(v?f(v,0):'kWh')+'</text>';
-  TT.forEach(function(x,k){var cx=L+(k+0.5)*gw;
+  items.forEach(function(item,k){var cx=L+(k+0.5)*gw,x=item.t;
     if(x)g+=bar(cx-bw-1,x.p,'cp')+bar(cx+1,x.c,'cc')+bar(cx+1,x.f,'cf',bw*0.55);     // production | consumption with solar + battery inside
-    g+='<text x="'+cx.toFixed(1)+'" y="'+(H-6)+'" text-anchor="middle">'+dDate(days[k]).toLocaleDateString(undefined,{day:'numeric',month:'numeric'})+'</text>';});
+    if(item.axis&&(n<=7||k%(n>12?5:(W<400?2:1))===0))
+      g+='<text x="'+cx.toFixed(1)+'" y="'+(H-6)+'" text-anchor="middle">'+item.axis+'</text>';});
   g+='<line class="ax" x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(0).toFixed(1)+'" y2="'+Y(0).toFixed(1)+'"/>';
-  g+=chMsg(some?'':(loading?'Loading\u2026':'No data for this week'),W,H)+'<g class="cur"></g></svg>';
-  curW=days.map(function(dn,k){return {n:dn,t:TT[k]};});
+  g+=chMsg(msg||(some?'':'No data for this '+period),W,H)+'<g class="cur"></g></svg>';
+  curW=items;
   var kwh=function(x){return some?f(x,1):'\u2013';};
   var lg='<span><i class="cp"></i>Solar production <b>'+kwh(sum[0])+' kWh</b></span>'+
     '<span><i class="cc"></i>Consumption <b>'+kwh(sum[1])+' kWh</b></span>'+
-    '<span><i class="cf"></i>From solar and battery <b>'+kwh(sum[2])+' kWh</b>'+(some&&sum[1]?' ('+Math.round(sum[2]*100/sum[1])+' %)':'')+'</span>';
+    '<span><i class="cf"></i>From solar and battery <b>'+kwh(sum[2])+' kWh</b>'+(some&&sum[1]?' ('+Math.round(sum[2]*100/sum[1])+' %)':'')+'</span>'+
+    (some&&partial?'<span>Available data only</span>':'');
   return h+g+'<div class="lgd">'+lg+'</div></section>';
+}
+function weekChart(){
+  var t=todayKey(),e=wEnd||t,days=[];
+  for(var i=6;i>=0;i--)days.push(addDays(e,-i));
+  var TT=days.map(dayTot),d0=dDate(days[0]),d1=dDate(e);
+  var title='Overview '+d0.getDate()+(d0.getMonth()!==d1.getMonth()?' '+MON[d0.getMonth()]:'')+' \u2013 '+d1.getDate()+' '+MON[d1.getMonth()];
+  var items=days.map(function(n,k){return {n:n,t:TT[k]||null,axis:dDate(n).toLocaleDateString(undefined,{day:'numeric',month:'numeric'})};});
+  return overviewBars(items,title,wHasBefore(e),!!wEnd,'wStep','week',
+    !TT.some(function(x){return !!x;})&&TT.some(function(x){return x===false;})?'Loading\u2026':'',false);
+}
+function summaryFor(year){
+  var entry=summaryYears[year];
+  if(!entry||(!entry.loading&&Date.now()-entry.at>60000)){
+    entry=summaryYears[year]={loading:true,at:Date.now()};
+    fetch('/history-summary?year='+year,{cache:'no-store'}).then(function(r){
+      if(!r.ok)throw new Error('History summary request failed ('+r.status+')');return r.json();
+    }).then(function(data){
+      if(!Array.isArray(data.days))throw new Error('Invalid history summary');
+      entry.days={};data.days.forEach(function(row){entry.days[row[0]]={p:row[1],c:row[2],f:row[3]};});
+      entry.loading=false;if(lastData)render(lastData);
+    }).catch(function(err){entry.loading=false;entry.error=true;console.error('History summary:',err);if(lastData)render(lastData);});
+  }
+  return entry;
+}
+function periodStep(dir){
+  var today=dDate(todayKey()),d;
+  if(ovPeriod==='m'){
+    d=monthView?dDate(monthView):new Date(today.getFullYear(),today.getMonth(),1);
+    d.setMonth(d.getMonth()+dir);monthView=dKey(d);
+  }else{
+    d=new Date(yearView||today.getFullYear(),0,1);d.setFullYear(d.getFullYear()+dir);yearView=d.getFullYear();
+  }
+  hSel=null;if(lastData)render(lastData);
+}
+function periodChart(){
+  var today=todayKey(),now=dDate(today),isMonth=ovPeriod==='m',
+    date=isMonth?(monthView?dDate(monthView):new Date(now.getFullYear(),now.getMonth(),1)):
+      new Date(yearView||now.getFullYear(),0,1),
+    year=date.getFullYear(),first=dKey(date),ds=(hist&&hist.days)||[],entry=hist?summaryFor(year):null,
+    msg=!entry||entry.loading?'Loading\u2026':entry.error?'Unable to load history':'',items=[],partial=false;
+  function value(n){return n===today?dayTot(n):(entry&&entry.days?entry.days[n]:null);}
+  function add(a,b){return {p:a.p+b.p,c:a.c+b.c,f:a.f+b.f};}
+  if(isMonth){
+    var count=new Date(year,date.getMonth()+1,0).getDate();
+    for(var i=1;i<=count;i++){var n=dKey(new Date(year,date.getMonth(),i)),v=msg?null:value(n);
+      if(n<=today&&!v)partial=true;
+      items.push({n:n,t:v||null,axis:String(i)});}
+  }else{
+    for(var m=0;m<12;m++){var total=null,days=new Date(year,m+1,0).getDate();
+      for(var j=1;j<=days;j++){var dn=dKey(new Date(year,m,j)),val=msg?null:value(dn);
+        if(dn<=today&&!val)partial=true;
+        if(val)total=add(total||{p:0,c:0,f:0},val);}
+      items.push({n:dKey(new Date(year,m,1)),t:total,axis:MON[m],label:MON[m]+' '+year});}
+  }
+  var title=isMonth?'Overview '+MON[date.getMonth()]+' '+year:'Overview '+year,
+    next=isMonth?year<now.getFullYear()||year===now.getFullYear()&&date.getMonth()<now.getMonth():year<now.getFullYear();
+  return overviewBars(items,title,ds.length>0&&ds[0]<first,next,'periodStep',isMonth?'month':'year',msg,partial);
 }
 // Battery charge level over the day (c = 0.1 %, null = no reading), same day as the chart above
 function consChart(){
@@ -745,7 +802,7 @@ function curDraw(){
     var wk=ds.cur==='w',d=curD,k=hSel;
     if(k==null||k<0||wk!==hSelW||(wk?!curW||k>=curW.length:!d||k>=d.s.length)){g.innerHTML='';continue;}
     var W=+ds.w,L=+ds.l,pw=+ds.pw,n=+ds.n,T=+ds.t,ph=+ds.ph,x=L+(k+0.5)*pw/n,rows=[],o=ds.cur==='o',v='',tm;
-    if(wk)tm=dayName(curW[k].n);else{var m=k*d.step;tm=('0'+Math.floor(m/60)).slice(-2)+':'+('0'+m%60).slice(-2);}
+    if(wk)tm=curW[k].label||dayName(curW[k].n);else{var m=k*d.step;tm=('0'+Math.floor(m/60)).slice(-2)+':'+('0'+m%60).slice(-2);}
     function Y(fr){return T+ph-ph*fr;}
     if(wk){var w=curW[k].t;
       if(w)rows=[['Production',f(w.p,1)+' kWh','cp'],['Consumption',f(w.c,1)+' kWh','cc'],['Solar + battery',f(w.f,1)+' kWh','cf']];}
@@ -768,15 +825,23 @@ function curDraw(){
     else{var c=d.c&&d.c[k]!=null?d.c[k]/10:null;
       if(c!=null){v+='<circle class="cd cf" cx="'+x.toFixed(1)+'" cy="'+Y(c/100).toFixed(1)+'" r="3"/>';rows=[['Battery',Math.round(c)+' %','cf']];}}
     if(!rows.length)rows=[[wk?'No data':'No reading','','']];
-    var bw=o||wk?138:78,lh=12,bh=7+lh*(rows.length+1),bx=x+7+bw<=W-4?x+7:x-7-bw;bx=Math.max(2,Math.min(W-4-bw,bx));
+    var lh=20,bh=7+lh*(rows.length+1);
     var t='<line x1="'+x.toFixed(1)+'" x2="'+x.toFixed(1)+'" y1="'+T+'" y2="'+(T+ph)+'"/>'+v+
-      '<rect class="bx" x="'+bx.toFixed(1)+'" y="'+T+'" width="'+bw+'" height="'+bh+'" rx="4.5"/>'+
-      '<text class="ct" x="'+(bx+6).toFixed(1)+'" y="'+(T+13)+'"><tspan class="tb">'+tm+'</tspan></text>';
-    rows.forEach(function(r,i){var y=T+13+lh*(i+1);
-      t+=(r[2]?'<rect class="sq '+r[2]+'" x="'+(bx+6).toFixed(1)+'" y="'+(y-6.5)+'" width="6.5" height="6.5" rx="1.5"/>':'')+
-        '<text class="ct" x="'+(bx+(r[2]?16:6)).toFixed(1)+'" y="'+y+'">'+r[0]+'</text>'+
-        '<text class="ct tb" x="'+(bx+bw-6).toFixed(1)+'" y="'+y+'" text-anchor="end">'+r[1]+'</text>';});
-    g.innerHTML=t;}
+      '<g class="tip"><rect class="bx" x="0" y="'+T+'" width="0" height="'+bh+'" rx="4.5"/>'+
+      '<text class="ct th" x="8" y="'+(T+20)+'"><tspan class="tb">'+tm+'</tspan></text>';
+    rows.forEach(function(r,i){var y=T+20+lh*(i+1);
+      t+=(r[2]?'<rect class="sq '+r[2]+'" x="8" y="'+(y-11)+'" width="10" height="10" rx="1.5"/>':'')+
+        '<text class="ct cl" x="'+(r[2]?24:8)+'" y="'+y+'">'+r[0]+'</text>'+
+        '<text class="ct tb cv" x="0" y="'+y+'" text-anchor="end">'+r[1]+'</text>';});
+    g.innerHTML=t+'</g>';
+    var tip=g.querySelector('.tip'),labels=tip.querySelectorAll('.cl'),values=tip.querySelectorAll('.cv'),
+      bw=tip.querySelector('.th').getComputedTextLength()+16;
+    rows.forEach(function(r,i){bw=Math.max(bw,(r[2]?24:8)+labels[i].getComputedTextLength()+
+      (r[1]?10+values[i].getComputedTextLength():0)+8);});
+    var bx=x+7+bw<=W-4?x+7:x-7-bw;bx=Math.max(2,Math.min(W-4-bw,bx));
+    tip.setAttribute('transform','translate('+bx.toFixed(1)+' 0)');
+    tip.querySelector('.bx').setAttribute('width',bw);
+    for(var a=0;a<values.length;a++)values[a].setAttribute('x',bw-8);}
 }
 function curMove(e){
   var svg=e.target&&e.target.closest?e.target.closest('svg[data-cur]'):null;
@@ -791,7 +856,7 @@ function render(d){
   lastData=d;
   var s=d.summary||{},h='';
   if(showFlow){wxCheck(d);h+=flow(s);}
-  if(showChart)h+=ovWeek?weekChart():chart();
+  if(showChart)h+=ovPeriod==='d'?chart():ovPeriod==='w'?weekChart():periodChart();
   if(showChart)h+=consChart();
   if(showImportChart)h+=impChart();
   if(showExportChart)h+=expChart();

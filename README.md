@@ -40,9 +40,10 @@ solar production (kW), use in the house, power to or from the grid, and the batt
 is charging or discharging. Top left is today's production; top right is the weather (or the moon at night).
 
 **Charts**: solar production, house consumption, grid import, grid export and battery level in 5-minute
-steps. Use **Day / Week** on the production chart to switch between one day and a week of daily totals, and
-the ‹ › arrows to go back in time (a year of days is kept by default). The power-flow production total uses
-the same recorded solar history as today's production chart.
+steps. Use **Day / Week / Month / Year** on the production chart to switch between the daily curve, weekly
+and monthly daily totals, or a calendar year's monthly totals. The ‹ › arrows navigate between periods.
+These views use available recorded history only (a year of days is kept by default); missing days are not
+reconstructed. The power-flow production total uses the same recorded solar history as today's production chart.
 
 <img width="1236" height="772" alt="image" src="https://github.com/user-attachments/assets/5e7a6ad6-84cc-4246-9674-65064679c604" />
 
@@ -190,6 +191,7 @@ systemd hands it to the service read-only.
 | `http://<linux-ip>/` | The dashboard |
 | `/json` (also `/api`) | All values as JSON; `/json?pretty` for readable output |
 | `/history` | Today's 5-minute chart data; `/history?day=yyyymmdd` for a previous day |
+| `/history-summary?year=yyyy` | Recorded daily production, consumption and solar-plus-battery totals in kWh for a calendar year, excluding today |
 | `/config` | [Setup page](#setup-page), **local network only** |
 
 A short part of `/json`:

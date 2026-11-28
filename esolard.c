@@ -903,18 +903,40 @@ static int histDays(int** out) {
     snprintf(dir, sizeof(dir), "%s/hist", dataDir);
     *out = NULL;
     DIR* d = opendir(dir);
-    if (!d) return 0;
+    if (!d) {
+        if (errno == ENOENT) return 0;
+        Log("Chart: cannot list history %s: %s", dir, strerror(errno));
+        return -1;
+    }
     int n = 0, cap = 0;
     struct dirent* e;
-    while ((e = readdir(d))) {
+    for (;;) {
+        errno = 0;
+        e = readdir(d);
+        if (!e) break;
         const char* nm = e->d_name;
         if (strlen(nm) != 12 || strcmp(nm + 8, ".bin")) continue;
         int day = atoi(nm);
         if (day < 20000000) continue;
-        if (n == cap) { cap = cap ? cap * 2 : 64; int* np = realloc(*out, cap * sizeof(int)); if (!np) break; *out = np; }
+        if (n == cap) {
+            cap = cap ? cap * 2 : 64;
+            int* np = realloc(*out, cap * sizeof(int));
+            if (!np) {
+                Log("Chart: cannot allocate history day list");
+                closedir(d); free(*out); *out = NULL;
+                return -1;
+            }
+            *out = np;
+        }
         (*out)[n++] = day;
     }
+    int err = errno;
     closedir(d);
+    if (err) {
+        Log("Chart: cannot read history directory %s: %s", dir, strerror(err));
+        free(*out); *out = NULL;
+        return -1;
+    }
     if (n) qsort(*out, n, sizeof(int), cmpInt);
     return n;
 }
@@ -928,6 +950,24 @@ static bool histReadDay(int day, HistData* h) {
     fclose(f);
     if (!ok) Log("Chart: invalid history file %s", path);
     return ok;
+}
+
+static bool histEnergy(const HistData* h, double* production, double* consumption, double* solarBattery) {
+    double p = 0, s = 0, b = 0, g = 0;
+    bool any = false;
+    for (int i = 0; i < HIST_SLOTS; i++) {
+        if (h->s[i] == HIST_NONE) continue;
+        any = true;
+        s += h->s[i];
+        if (h->p[i] != HIST_NONE) p += h->p[i];
+        if (h->b[i] != HIST_NONE) b += h->b[i];
+        if (h->g[i] != HIST_NONE) g += h->g[i];
+    }
+    double k = HIST_STEP_MIN / 60000.0;
+    *production = p * k;
+    *consumption = (s + b + g) * k;
+    *solarBattery = (s + b) * k;
+    return any;
 }
 
 // A finished day -> file, then drop the files beyond histKeepDays (poll thread, outside dataMutex)
@@ -2166,6 +2206,49 @@ static void handleConfig(int fd, bool head) {
 }
 
 // Usage chart data includes total grid import (i) and export (e), in watts.
+static void handleHistorySummary(int fd, const char* query, bool head) {
+    int year;
+    if (!query || strlen(query) != 9 || strncmp(query, "year=", 5) ||
+        strspn(query + 5, "0123456789") != 4 || (year = atoi(query + 5)) < 2000) {
+        const char* err = "{\"error\":\"invalid year\"}";
+        replyN(fd, 400, "application/json", err, strlen(err), NULL, head);
+        return;
+    }
+    pthread_mutex_lock(&dataMutex);
+    int today = histDay;
+    pthread_mutex_unlock(&dataMutex);
+    int* days;
+    int count = histDays(&days);
+    if (count < 0) {
+        const char* err = "{\"error\":\"could not list history\"}";
+        replyN(fd, 503, "application/json", err, strlen(err), NULL, head);
+        return;
+    }
+    Sb o = { 0 };
+    sbPut(&o, "{\"days\":[");
+    bool first = true;
+    for (int i = 0; i < count; i++) {
+        if (days[i] / 10000 != year || (today && days[i] >= today)) continue;
+        HistData h;
+        if (!histReadDay(days[i], &h)) {
+            const char* err = "{\"error\":\"could not read history\"}";
+            Log("Chart: cannot read history summary for day %d", days[i]);
+            free(days);
+            sbFree(&o);
+            replyN(fd, 503, "application/json", err, strlen(err), NULL, head);
+            return;
+        }
+        double p, c, f;
+        if (!histEnergy(&h, &p, &c, &f)) continue;
+        sbPrintf(&o, "%s[%d,%.6f,%.6f,%.6f]", first ? "" : ",", days[i], p, c, f);
+        first = false;
+    }
+    free(days);
+    sbPut(&o, "]}");
+    replyN(fd, 200, "application/json", o.p, o.n, NULL, head);
+    sbFree(&o);
+}
+
 static void handleHistory(int fd, const char* query, bool head) {
     HistData copy;
     int day, slot, today;
@@ -2197,6 +2280,12 @@ static void handleHistory(int fd, const char* query, bool head) {
     sbPut(&o, ",\"days\":[");
     int* days;
     int nd = histDays(&days);
+    if (nd < 0) {
+        const char* err = "{\"error\":\"could not list history\"}";
+        sbFree(&o);
+        replyN(fd, 503, "application/json", err, strlen(err), NULL, head);
+        return;
+    }
     for (int i = 0, first = 1; i < nd; i++) {
         if (days[i] == today) continue;            // today is not a previous day
         sbPrintf(&o, first ? "%d" : ",%d", days[i]);
@@ -2260,6 +2349,7 @@ static void handleClient(int fd) {
     }
     else if (!strcmp(target, "/") && isGet) handleRoot(fd, local, head);
     else if (!strcmp(target, "/history") && isGet) handleHistory(fd, query, head);
+    else if (!strcmp(target, "/history-summary") && isGet) handleHistorySummary(fd, query, head);
     else if ((!strcmp(target, "/apple-touch-icon.png") || !strcmp(target, "/apple-touch-icon-precomposed.png") ||
               !strcmp(target, "/favicon.ico")) && isGet)
         replyN(fd, 200, "image/png", ICON_PNG, sizeof(ICON_PNG), "Cache-Control: public, max-age=86400\r\n", head);
@@ -2412,6 +2502,7 @@ static int loadConfig(const char* path, bool required) {
 static int fillSplit(void) {
     int* days;
     int n = histDays(&days), done = 0, skipped = 0;
+    if (n < 0) return 1;
     if (!n) { printf("No chart days in %s/hist\n", dataDir); return 1; }
     My m = { -1, 0, "" };
     if (!myConnect(&m, sqlServer, sqlPort, sqlUser, sqlPass)) { printf("SQL: %s\n", m.err); free(days); return 1; }
