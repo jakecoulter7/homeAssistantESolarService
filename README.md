@@ -44,6 +44,10 @@ steps. Use **Day / Week / Month / Year** on the production chart to switch betwe
 and monthly daily totals, or a calendar year's monthly totals. The ‹ › arrows navigate between periods.
 These views use available recorded history only (a year of days is kept by default); missing days are not
 reconstructed. The power-flow production total uses the same recorded solar history as today's production chart.
+The Home Assistant add-on's grid import chart shows day/night energy, percentages and an estimated cost using Share Energy's 2026 rates
+(36.49p/kWh day, 17.19p/kWh night, including VAT but excluding standing charges). The night window
+is 01:00–08:00 GMT or 02:00–09:00 BST; its boundaries appear on daily charts. On the autumn clock
+change, the breakdown is unavailable if the recorded repeated hour cannot be distinguished.
 
 <img width="1236" height="772" alt="image" src="https://github.com/user-attachments/assets/5e7a6ad6-84cc-4246-9674-65064679c604" />
 
@@ -191,7 +195,7 @@ systemd hands it to the service read-only.
 | `http://<linux-ip>/` | The dashboard |
 | `/json` (also `/api`) | All values as JSON; `/json?pretty` for readable output |
 | `/history` | Today's 5-minute chart data; `/history?day=yyyymmdd` for a previous day |
-| `/history-summary?year=yyyy` | Recorded daily production, consumption and solar-plus-battery totals in kWh for a calendar year, excluding today |
+| `/history-summary?year=yyyy` | Daily production, consumption, grid import and export totals in kWh; the add-on also includes 24 hourly import totals. Excludes today |
 | `/config` | [Setup page](#setup-page), **local network only** |
 
 A short part of `/json`:
