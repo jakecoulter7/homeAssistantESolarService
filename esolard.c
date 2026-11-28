@@ -952,9 +952,9 @@ static bool histReadDay(int day, HistData* h) {
     return ok;
 }
 
-static bool histEnergy(const HistData* h, double* production, double* consumption, double* solarBattery) {
-    double p = 0, s = 0, b = 0, g = 0;
-    bool any = false;
+static bool histEnergy(const HistData* h, double* production, double* consumption, double* gridImport, double* gridExport) {
+    double p = 0, s = 0, b = 0, g = 0, im = 0, ex = 0;
+    bool any = false, anyImport = false, anyExport = false;
     for (int i = 0; i < HIST_SLOTS; i++) {
         if (h->s[i] == HIST_NONE) continue;
         any = true;
@@ -962,11 +962,14 @@ static bool histEnergy(const HistData* h, double* production, double* consumptio
         if (h->p[i] != HIST_NONE) p += h->p[i];
         if (h->b[i] != HIST_NONE) b += h->b[i];
         if (h->g[i] != HIST_NONE) g += h->g[i];
+        if (h->i[i] != HIST_NONE) { im += h->i[i]; anyImport = true; }
+        if (h->e[i] != HIST_NONE) { ex += h->e[i]; anyExport = true; }
     }
     double k = HIST_STEP_MIN / 60000.0;
     *production = p * k;
     *consumption = (s + b + g) * k;
-    *solarBattery = (s + b) * k;
+    *gridImport = anyImport ? im * k : NAN;
+    *gridExport = anyExport ? ex * k : NAN;
     return any;
 }
 
@@ -2119,12 +2122,11 @@ static void handleConfig(int fd, bool head) {
     sOpen(&o, "monitor", "Monitor", "These act at once, no need to save.");
     mSwitch(&o, "Power flow", "Picture at the top of the dashboard: sun, house, grid and battery, with moving arrows where power flows now. On by default. Remembered in this browser.", "m_flow", false);
     mSwitch(&o, "Garden", "The fence, the grass and the flowers around the house in the power flow picture. On by default. Remembered in this browser.", "m_garden", false);
-    snprintf(t, sizeof(t), "Solar production and house consumption per 5 minutes, just under the power flow picture. "
-        "Today and up to %u days before (arrows on the chart). On by default. Remembered in this browser.", histKeepDays);
+    snprintf(t, sizeof(t), "Solar production and house consumption, plus weekly, monthly and yearly energy totals. "
+        "Today and up to %u days before (arrows on the charts). On by default. Remembered in this browser.", histKeepDays);
     mSwitch(&o, "Solar production and consumption charts", t, "m_chart", false);
     mSwitch(&o, "Battery chart", "Battery charge level per 5 minutes, under the production and consumption chart. On by default. Remembered in this browser.", "m_bchart", false);
-    mSwitch(&o, "Import chart", "Total power imported from the grid. On by default. Remembered in this browser.", "m_imp", false);
-    mSwitch(&o, "Export chart", "Total power exported to the grid. On by default. Remembered in this browser.", "m_exp", false);
+    mSwitch(&o, "Grid import and export chart", "Grid import and export power shown together. On by default. Remembered in this browser.", "m_grid", false);
     mSwitch(&o, "Details", "Inverter, meter and battery tables on the dashboard. Remembered in this browser.", "m_det", false);
     sbPut(&o, "</section>");
 
@@ -2238,9 +2240,13 @@ static void handleHistorySummary(int fd, const char* query, bool head) {
             replyN(fd, 503, "application/json", err, strlen(err), NULL, head);
             return;
         }
-        double p, c, f;
-        if (!histEnergy(&h, &p, &c, &f)) continue;
-        sbPrintf(&o, "%s[%d,%.6f,%.6f,%.6f]", first ? "" : ",", days[i], p, c, f);
+        double p, c, gridImport, gridExport;
+        if (!histEnergy(&h, &p, &c, &gridImport, &gridExport)) continue;
+        sbPrintf(&o, "%s[%d,", first ? "" : ",", days[i]);
+        jNumRaw(&o, p, 6); sbPutc(&o, ',');
+        jNumRaw(&o, c, 6); sbPutc(&o, ',');
+        jNumRaw(&o, gridImport, 6); sbPutc(&o, ',');
+        jNumRaw(&o, gridExport, 6); sbPutc(&o, ']');
         first = false;
     }
     free(days);

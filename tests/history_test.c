@@ -2,7 +2,11 @@
 #undef NDEBUG
 #endif
 #define main esolard_main
+#ifdef HISTORY_TEST_GLEBE
+#include "../esolard.c"
+#else
 #include "../esolarservice/esolard.c"
+#endif
 #undef main
 #include <assert.h>
 
