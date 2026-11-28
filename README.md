@@ -346,6 +346,9 @@ The day changes at local midnight (`timezone`). Old chart days beyond `hist_keep
 
 ## Updating
 
+Home Assistant add-on **0.0.34** includes the larger, non-overlapping chart tooltips and Month/Year
+history views. Its dashboard reports **1.3.5-linux-jc2**; the standalone build reports **1.4.2-linux**.
+
 In the folder with the new files:
 
 ```sh

@@ -53,7 +53,7 @@
 #include "WebPages.h"      // dashboard and setup page: styles, HTML, JavaScript
 #include "icon.h"          // home-screen icon (PNG)
 
-#define ESOLARD_VERSION "1.4.1-linux"
+#define ESOLARD_VERSION "1.4.2-linux"
 
 // ---------------------------------------------------------------------------
 // Settings (command line, see usage())
