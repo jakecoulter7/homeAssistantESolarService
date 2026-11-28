@@ -39,13 +39,11 @@ The program is one C file with no external libraries: only GCC is needed.
 solar production (kW), use in the house, power to or from the grid, and the battery level and whether it
 is charging or discharging. Top left is today's production; top right is the weather (or the moon at night).
 
-**Charts**: daily solar production and house consumption curves, plus grid import and export bars overlaid
-in the same chart. Use **Day / Week / Month / Year** to switch between daily readings, weekly and monthly
-daily totals, or a calendar year's monthly totals. The period views show production and consumption in
-separate charts; grid import and export remain overlaid, with export in a deeper green. The ‹ › arrows
-navigate between periods. These views use available recorded history only (a year of days is kept by default);
-missing days are not reconstructed. The power-flow production total uses the same recorded solar history as
-today's production chart.
+**Charts**: solar production, house consumption, grid import, grid export and battery level in 5-minute
+steps. Use **Day / Week / Month / Year** on the production chart to switch between the daily curve, weekly
+and monthly daily totals, or a calendar year's monthly totals. The ‹ › arrows navigate between periods.
+These views use available recorded history only (a year of days is kept by default); missing days are not
+reconstructed. The power-flow production total uses the same recorded solar history as today's production chart.
 
 <img width="1236" height="772" alt="image" src="https://github.com/user-attachments/assets/5e7a6ad6-84cc-4246-9674-65064679c604" />
 
@@ -193,7 +191,7 @@ systemd hands it to the service read-only.
 | `http://<linux-ip>/` | The dashboard |
 | `/json` (also `/api`) | All values as JSON; `/json?pretty` for readable output |
 | `/history` | Today's 5-minute chart data; `/history?day=yyyymmdd` for a previous day |
-| `/history-summary?year=yyyy` | Recorded daily production, consumption, grid import and export totals in kWh for a calendar year, excluding today |
+| `/history-summary?year=yyyy` | Recorded daily production, consumption and solar-plus-battery totals in kWh for a calendar year, excluding today |
 | `/config` | [Setup page](#setup-page), **local network only** |
 
 A short part of `/json`:
@@ -227,7 +225,7 @@ network (also behind a reverse proxy, through `X-Forwarded-For`).
 
 ![Setup page](docs/setup.png)
 
-- **Monitor**: switch dashboard parts on or off (power flow, garden, production and consumption charts, grid import and export chart, details).
+- **Monitor**: switch dashboard parts on or off (power flow, garden, charts, Production & consumption, details).
   These act at once and are remembered in that browser.
 - **Inverter, SQL logging, Weather**: the settings in use and their status (last reading, last SQL write,
   rows waiting, the weather now). They are read-only here: change them in `/etc/esolard.conf`.
@@ -348,9 +346,8 @@ The day changes at local midnight (`timezone`). Old chart days beyond `hist_keep
 
 ## Updating
 
-Home Assistant add-on **0.0.37** includes separate production and consumption period charts and overlaid
-grid import/export bars, with export in a deeper green. Its dashboard reports **1.3.5-linux-jc3**; the
-standalone build reports **1.4.2-linux**.
+Home Assistant add-on **0.0.34** includes the larger, non-overlapping chart tooltips and Month/Year
+history views. Its dashboard reports **1.3.5-linux-jc2**; the standalone build reports **1.4.2-linux**.
 
 In the folder with the new files:
 
