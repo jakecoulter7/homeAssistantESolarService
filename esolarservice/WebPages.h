@@ -160,8 +160,8 @@ base=snap();update();
 )SETUPTAIL";
 
 static const char DASH_CSS[] = R"rawliteral(
-:root{--sun:#e59a00;--pos:#1f9d62;--neg:#d9341f;--bat:#1a6fd6}
-@media(prefers-color-scheme:dark){:root{--sun:#ffb62e;--pos:#3ccf8e;--neg:#ff5a45;--bat:#6aa9ff}}
+:root{--sun:#e59a00;--pos:#1f9d62;--exp:#086b3b;--neg:#d9341f;--bat:#1a6fd6}
+@media(prefers-color-scheme:dark){:root{--sun:#ffb62e;--pos:#3ccf8e;--exp:#14874d;--neg:#ff5a45;--bat:#6aa9ff}}
 :root{--hh:calc(56px + env(safe-area-inset-top,0px))}
 .top b{font-size:20px}
 .top .ghost{padding:5px 10px;font-size:13px}
@@ -238,19 +238,21 @@ td:last-child{text-align:right;font-variant-numeric:tabular-nums}
 .chart .seg button.on{background:var(--ink);color:var(--surf);font-weight:600}
 .chart rect.wb{fill-opacity:.35;stroke-width:1.2}
 .chart rect.wb.cp{fill:var(--pos);stroke:var(--pos)}.chart rect.wb.cc{fill:var(--sun);stroke:var(--sun)}.chart rect.wb.cf{fill:var(--bat);stroke:var(--bat)}
+.chart rect.wb.ce{fill:var(--exp);stroke:var(--exp);fill-opacity:.75}
 .chart rect.wb.ci{fill:var(--neg);stroke:var(--neg);fill-opacity:.6}
 @supports (fill:color-mix(in srgb,red,blue)){.chart rect.wb{fill-opacity:1}
 .chart rect.wb.cp{fill:color-mix(in srgb,var(--pos) 38%,var(--surf))}.chart rect.wb.cc{fill:color-mix(in srgb,var(--sun) 40%,var(--surf))}
-.chart rect.wb.cf{fill:color-mix(in srgb,var(--bat) 42%,var(--surf))}.chart rect.wb.ci{fill:color-mix(in srgb,var(--neg) 42%,var(--surf))}}
+.chart rect.wb.cf{fill:color-mix(in srgb,var(--bat) 42%,var(--surf))}.chart rect.wb.ce{fill:color-mix(in srgb,var(--exp) 68%,var(--surf))}
+.chart rect.wb.ci{fill:color-mix(in srgb,var(--neg) 42%,var(--surf))}}
 .chart svg[data-cur]{touch-action:pan-y;cursor:crosshair;-webkit-user-select:none;user-select:none}
 .chart .cur{pointer-events:none}.chart .cur line{stroke:var(--ink);stroke-width:1;stroke-dasharray:3 3}
 .chart .cur .cd{stroke:var(--surf);stroke-width:1}.chart .cur .bx{fill:var(--surf);stroke:var(--line);opacity:.96}
 .chart .cur text.ct{fill:var(--ink);font-size:16px}.chart .cur .tb{font-weight:700}
-.chart .cur .cp{fill:var(--pos)}.chart .cur .cc{fill:var(--sun)}.chart .cur .cf{fill:var(--bat)}.chart .cur .ci{fill:var(--neg)}
+.chart .cur .cp{fill:var(--pos)}.chart .cur .cc{fill:var(--sun)}.chart .cur .cf{fill:var(--bat)}.chart .cur .ce{fill:var(--exp)}.chart .cur .ci{fill:var(--neg)}
 .lgd{display:flex;flex-wrap:wrap;gap:6px 20px;margin-top:8px;font-size:13px;color:var(--mut)}
 .lgd b{color:var(--ink);font-weight:600}
 .lgd i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
-.lgd i.cp{background:var(--pos)}.lgd i.cc{background:var(--sun)}.lgd i.cf{background:var(--bat)}.lgd i.ci{background:var(--neg)}
+.lgd i.cp{background:var(--pos)}.lgd i.cc{background:var(--sun)}.lgd i.cf{background:var(--bat)}.lgd i.ce{background:var(--exp)}.lgd i.ci{background:var(--neg)}
 .card.flow{padding:0;overflow:hidden;margin:16px 0 10px}
 .flow svg{display:block;width:100%;aspect-ratio:600/415;max-height:450px}
 .flow{--sky1:#d6ecf8;--sky2:#f2f9fd;--gnd:#e9edf0;--pv:#3f63d3;--win:#f8e6a0;--wof:#c3cee0;
@@ -617,7 +619,7 @@ function overviewBars(items,title,prev,next,step,period,msg,partial,series){
 var PERIOD_SERIES={
   p:[{key:'p',label:'Solar production',cls:'cp'}],
   c:[{key:'c',label:'Consumption',cls:'cc'}],
-  grid:[{key:'e',label:'Grid export',cls:'cp'},{key:'i',label:'Grid import',cls:'ci'}]
+  grid:[{key:'e',label:'Grid export',cls:'ce'},{key:'i',label:'Grid import',cls:'ci'}]
 };
 function weekChart(kind){
   var t=todayKey(),e=wEnd||t,days=[];
@@ -733,13 +735,13 @@ function gridChart(){
   var g='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Grid import and export" data-cur="ie" data-w="'+W+'" data-l="'+L+'" data-pw="'+pw+'" data-n="'+n+'" data-t="'+T+'" data-ph="'+ph+'" data-top="'+top+'">';
   for(v=0;v<=top+1e-9;v+=st)g+='<line class="gl" x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(v*1000).toFixed(1)+'" y2="'+Y(v*1000).toFixed(1)+'"/>'+
     '<text x="'+(L-6)+'" y="'+(Y(v*1000)+4).toFixed(1)+'" text-anchor="end">'+(v?f(v,st<1?1:0):'kW')+'</text>';
-  for(i=0;i<n;i++)g+=bar(i,E(i),'cp')+bar(i,I(i),'ci');
+  for(i=0;i<n;i++)g+=bar(i,E(i),'ce')+bar(i,I(i),'ci');
   var hg={s:''};chHours(hg,L,pw,n,d.step,H);g+=hg.s;
   g+='<line class="ax" x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(0).toFixed(1)+'" y2="'+Y(0).toFixed(1)+'"/>';
   if(d.slot>=0)g+='<line class="now" x1="'+X(d.slot).toFixed(1)+'" x2="'+X(d.slot).toFixed(1)+'" y1="'+T+'" y2="'+Y(0).toFixed(1)+'"/>';
   g+=chMsg(cd.msg||(!anyI&&!anyE?'No grid history available':''),W,H)+'<g class="cur"></g></svg>';
   var kwh=function(w,any){return cd.msg||!any?'–':f(w*d.step/60000,1);};
-  var lg='<span><i class="cp"></i>Grid export <b>'+kwh(ex,anyE)+' kWh</b></span>'+
+  var lg='<span><i class="ce"></i>Grid export <b>'+kwh(ex,anyE)+' kWh</b></span>'+
     '<span><i class="ci"></i>Grid import <b>'+kwh(im,anyI)+' kWh</b></span>'+
     ((anyI||anyE)&&partial?'<span>Partial history</span>':'');
   return h+g+'<div class="lgd">'+lg+'</div></section>';
@@ -799,7 +801,7 @@ function curDraw(){
           v+='<circle class="cd '+r[2]+'" cx="'+x.toFixed(1)+'" cy="'+Y(r[1]/top).toFixed(1)+'" r="3"/>';return [r[0],f(r[1]/1000,2)+' kW',r[2]];});}}
     else if(ds.cur==='ie'){var top=+ds.top*1000;
       rows=[];
-      if(d.e&&d.e[k]!=null){var EX=d.e[k];v+='<circle class="cd cp" cx="'+x.toFixed(1)+'" cy="'+Y(EX/top).toFixed(1)+'" r="3"/>';rows.push(['Export',f(EX/1000,2)+' kW','cp']);}
+      if(d.e&&d.e[k]!=null){var EX=d.e[k];v+='<circle class="cd ce" cx="'+x.toFixed(1)+'" cy="'+Y(EX/top).toFixed(1)+'" r="3"/>';rows.push(['Export',f(EX/1000,2)+' kW','ce']);}
       if(d.i&&d.i[k]!=null){var IM=d.i[k];v+='<circle class="cd ci" cx="'+x.toFixed(1)+'" cy="'+Y(IM/top).toFixed(1)+'" r="3"/>';rows.push(['Import',f(IM/1000,2)+' kW','ci']);}}
     else{var c=d.c&&d.c[k]!=null?d.c[k]/10:null;
       if(c!=null){v+='<circle class="cd cf" cx="'+x.toFixed(1)+'" cy="'+Y(c/100).toFixed(1)+'" r="3"/>';rows=[['Battery',Math.round(c)+' %','cf']];}}
