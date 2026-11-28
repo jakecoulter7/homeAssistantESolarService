@@ -2095,8 +2095,8 @@ static void infoRow(Sb* o, const char* label, const char* hint, const char* val)
 
 static void handleRoot(int fd, bool local, bool head) {
     Sb o = { 0 };
-    uiHead(&o, "eSolar", DASH_CSS);
-    uiTopBar(&o, "eSolar",
+    uiHead(&o, "SolarEdge", DASH_CSS);
+    uiTopBar(&o, "SolarEdge",
         // countdown ring to the next reading, right of the title block; driven by tick() in the page script
         "<span id=\"tick\" hidden role=\"img\" aria-label=\"Next update\"><svg viewBox=\"0 0 24 24\">"
         "<circle class=\"tr\" cx=\"12\" cy=\"12\" r=\"10\"/><circle class=\"tp\" cx=\"12\" cy=\"12\" r=\"10\"/></svg>"
