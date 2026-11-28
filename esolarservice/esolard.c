@@ -2246,7 +2246,19 @@ static void handleHistorySummary(int fd, const char* query, bool head) {
         jNumRaw(&o, p, 6); sbPutc(&o, ',');
         jNumRaw(&o, c, 6); sbPutc(&o, ',');
         jNumRaw(&o, gridImport, 6); sbPutc(&o, ',');
-        jNumRaw(&o, gridExport, 6); sbPutc(&o, ']');
+        jNumRaw(&o, gridExport, 6); sbPut(&o, ",[");
+        for (int hour = 0; hour < 24; hour++) {
+            double import = 0;
+            bool haveImport = false;
+            for (int slot = hour * 60 / HIST_STEP_MIN; slot < (hour + 1) * 60 / HIST_STEP_MIN; slot++) {
+                if (h.s[slot] == HIST_NONE || h.i[slot] == HIST_NONE) continue;
+                import += h.i[slot] * HIST_STEP_MIN / 60000.0;
+                haveImport = true;
+            }
+            if (hour) sbPutc(&o, ',');
+            jNumRaw(&o, haveImport ? import : NAN, 6);
+        }
+        sbPut(&o, "]]");
         first = false;
     }
     free(days);
