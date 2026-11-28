@@ -599,13 +599,19 @@ function tariffSplit(day,values,step,mask,energy){
   }
   return any?{day:daySum,night:nightSum}:null;
 }
-function tariffDetails(day,night,total){
+function standingDays(first,last,today){
+  if(last>today)last=today;
+  if(last<first)return 0;
+  function utc(n){return Date.UTC(Math.floor(n/10000),Math.floor(n/100)%100-1,n%100);}
+  return Math.round((utc(last)-utc(first))/86400000)+1;
+}
+function tariffDetails(day,night,total,days){
   if(total==null)return '';
   if(day==null||night==null)return ' <span>Tariff breakdown unavailable</span>';
   var pct=function(v){return total>0?f(100*v/total,0)+'%':'\u2013';};
   return ' <span class="rate-breakdown">(<span><i class="day"></i>Day '+pct(day)+' '+f(day,1)+' kWh</span>'+
     '<span><i class="night"></i>Night '+pct(night)+' '+f(night,1)+' kWh</span>)</span>'+
-    ' <span>Estimated cost \u00a3'+f(day*.3649+night*.1719,2)+' (2026 rates; no standing charge)</span>';
+    ' <span>Estimated cost \u00a3'+f(day*.3649+night*.1719+days*.1333,2)+' (2026 rates; recorded import + standing charge)</span>';
 }
 function wHasBefore(e){var ds=(hist&&hist.days)||[];return ds.length>0&&ds[0]<=addDays(e,-7);}   // any day before this week?
 function wStep(dir){var t=todayKey(),e=wEnd||t,ne=addDays(e,7*dir);
@@ -623,7 +629,7 @@ function dayTot(n){var d;
   var rates=tariffSplit(n,d.i,d.step,d.s);
   return any?{p:p*k,c:c*k,i:anyI?im*k:null,e:anyE?ex*k:null,
     id:rates?rates.day:null,inight:rates?rates.night:null}:null;}
-function overviewBars(items,title,prev,next,step,period,msg,partial,series){
+function overviewBars(items,title,prev,next,step,period,msg,partial,series,chargeDays){
   var h=chHead2(title,prev,next,step,period,ovSeg()),n=items.length,W=chWidth(),
     H=138,L=period==='year'?58:34,R=8,T=10,B=24,pw=W-L-R,ph=H-T-B,max=0,
     sums=series.map(function(){return 0;}),counts=series.map(function(){return 0;}),v,
@@ -658,7 +664,7 @@ function overviewBars(items,title,prev,next,step,period,msg,partial,series){
   curW=items;
   var kwh=function(j){return counts[j]?f(sums[j],1):'\u2013';};
   var lg=series.map(function(s,j){return '<span'+(s.key==='i'?' class="import-legend"':'')+'><i class="'+s.cls+'"></i>'+s.label+' <b>'+kwh(j)+' kWh</b>'+
-    (s.key==='i'&&rateAny?tariffDetails(rateMissing?null:rateDay,rateMissing?null:rateNight,sums[j]):'')+'</span>';}).join('')+
+    (s.key==='i'&&rateAny?tariffDetails(rateMissing?null:rateDay,rateMissing?null:rateNight,sums[j],chargeDays):'')+'</span>';}).join('')+
     (some&&partial?'<span>Available data only</span>':'');
   return h+g+'<div class="lgd">'+lg+'</div></section>';
 }
@@ -674,7 +680,7 @@ function weekChart(kind){
   var title=(kind==='p'?'Solar production':kind==='c'?'Consumption':'Grid import & export')+' '+d0.getDate()+(d0.getMonth()!==d1.getMonth()?' '+MON[d0.getMonth()]:'')+' \u2013 '+d1.getDate()+' '+MON[d1.getMonth()];
   var items=days.map(function(n,k){return {n:n,t:TT[k]||null,axis:dDate(n).toLocaleDateString(undefined,{day:'numeric',month:'numeric'})};});
   return overviewBars(items,title,wHasBefore(e),!!wEnd,'wStep','week',
-    !TT.some(function(x){return !!x;})&&TT.some(function(x){return x===false;})?'Loading\u2026':'',false,PERIOD_SERIES[kind]);
+    !TT.some(function(x){return !!x;})&&TT.some(function(x){return x===false;})?'Loading\u2026':'',false,PERIOD_SERIES[kind],standingDays(days[0],e,t));
 }
 function summaryFor(year){
   var entry=summaryYears[year];
@@ -731,7 +737,8 @@ function periodChart(kind){
   }
   var title=(kind==='p'?'Solar production':kind==='c'?'Consumption':'Grid import & export')+' '+(isMonth?MON[date.getMonth()]+' '+year:String(year)),
     next=isMonth?year<now.getFullYear()||year===now.getFullYear()&&date.getMonth()<now.getMonth():year<now.getFullYear();
-  return overviewBars(items,title,ds.length>0&&ds[0]<first,next,'periodStep',isMonth?'month':'year',msg,partial,PERIOD_SERIES[kind]);
+  var last=isMonth?year*10000+(date.getMonth()+1)*100+new Date(year,date.getMonth()+1,0).getDate():year*10000+1231;
+  return overviewBars(items,title,ds.length>0&&ds[0]<first,next,'periodStep',isMonth?'month':'year',msg,partial,PERIOD_SERIES[kind],standingDays(first,last,today));
 }
 // Battery charge level over the day (c = 0.1 %, null = no reading), same day as the chart above
 function consChart(){
@@ -801,7 +808,7 @@ function gridChart(){
   g+=chMsg(cd.msg||(!anyI&&!anyE?'No grid history available':''),W,H)+'<g class="cur"></g></svg>';
   var kwh=function(w,any){return cd.msg||!any?'–':f(w*d.step/60000,1);};
   var lg='<span class="import-legend"><i class="ci"></i>Grid import <b>'+kwh(im,anyI)+' kWh</b>'+
-    (anyI&&!cd.msg?tariffDetails(rates?rates.day:null,rates?rates.night:null,im*d.step/60000):'')+'</span>'+
+    (anyI&&!cd.msg?tariffDetails(rates?rates.day:null,rates?rates.night:null,im*d.step/60000,1):'')+'</span>'+
     '<span><i class="ce"></i>Grid export <b>'+kwh(ex,anyE)+' kWh</b></span>'+
     ((anyI||anyE)&&partial?'<span>Partial history</span>':'');
   return h+g+'<div class="lgd">'+lg+'</div></section>';

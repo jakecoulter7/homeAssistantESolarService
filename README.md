@@ -45,7 +45,9 @@ and monthly daily totals, or a calendar year's monthly totals. The ‹ › arrow
 These views use available recorded history only (a year of days is kept by default); missing days are not
 reconstructed. The power-flow production total uses the same recorded solar history as today's production chart.
 The Home Assistant add-on's grid import chart shows day/night energy, percentages and an estimated cost using Share Energy's 2026 rates
-(36.49p/kWh day, 17.19p/kWh night, including VAT but excluding standing charges). The night window
+(36.49p/kWh day, 17.19p/kWh night and 13.33p/day standing charge, including VAT). The estimate
+uses recorded import plus the standing charge for every elapsed calendar day in the selected period.
+The night window
 is 01:00–08:00 GMT or 02:00–09:00 BST; its boundaries appear on daily charts. On the autumn clock
 change, the breakdown is unavailable if the recorded repeated hour cannot be distinguished.
 
