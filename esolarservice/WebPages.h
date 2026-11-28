@@ -242,8 +242,9 @@ td:last-child{text-align:right;font-variant-numeric:tabular-nums}
 .chart rect.wb.ci{fill:var(--neg);stroke:var(--neg);fill-opacity:.6}
 @supports (fill:color-mix(in srgb,red,blue)){.chart rect.wb{fill-opacity:1}
 .chart rect.wb.cp{fill:color-mix(in srgb,var(--pos) 38%,var(--surf))}.chart rect.wb.cc{fill:color-mix(in srgb,var(--sun) 40%,var(--surf))}
-.chart rect.wb.cf{fill:color-mix(in srgb,var(--bat) 42%,var(--surf))}.chart rect.wb.ce{fill:color-mix(in srgb,var(--exp) 68%,var(--surf))}
-.chart rect.wb.ci{fill:color-mix(in srgb,var(--neg) 42%,var(--surf))}}
+.chart rect.wb.cf{fill:color-mix(in srgb,var(--bat) 42%,var(--surf))}}
+.chart rect.wb.ce{fill:var(--exp);fill-opacity:.75;stroke:none}
+.chart rect.wb.ci{fill:var(--neg);fill-opacity:.6;stroke:none}
 .chart svg[data-cur]{touch-action:pan-y;cursor:crosshair;-webkit-user-select:none;user-select:none}
 .chart .cur{pointer-events:none}.chart .cur line{stroke:var(--ink);stroke-width:1;stroke-dasharray:3 3}
 .chart .cur .cd{stroke:var(--surf);stroke-width:1}.chart .cur .bx{fill:var(--surf);stroke:var(--line);opacity:.96}
@@ -599,13 +600,15 @@ function overviewBars(items,title,prev,next,step,period,msg,partial,series){
   function Y(k){return T+ph-ph*k/top;}
   var gw=pw/n,bw=Math.min(gw*0.68,40);
   function bar(x,k,c,w){if(!(k>0))return '';var y=Y(k);
-    return '<rect class="wb '+c+'" x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+(w||bw).toFixed(1)+'" height="'+(T+ph-y).toFixed(1)+'" rx="1.5"/>';}
+    return '<rect class="wb '+c+'" x="'+x.toFixed(3)+'" y="'+y.toFixed(1)+'" width="'+(w||bw).toFixed(3)+'" height="'+(T+ph-y).toFixed(1)+'" rx="'+(c==='ci'||c==='ce'?0:1.5)+'"/>';}
   var metric=series.length>1?'grid':series[0].key,
     g='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+title+'" data-cur="w" data-series="'+metric+'" data-w="'+W+'" data-l="'+L+'" data-pw="'+pw+'" data-n="'+n+'" data-t="'+T+'" data-ph="'+ph+'">';
   for(v=0;v<=top+1e-9;v+=st)g+='<line class="gl" x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(v).toFixed(1)+'" y2="'+Y(v).toFixed(1)+'"/>'+
     '<text x="'+(L-6)+'" y="'+(Y(v)+4).toFixed(1)+'" text-anchor="end">'+(v?f(v,0):'kWh')+'</text>';
   items.forEach(function(item,k){var cx=L+(k+0.5)*gw,x=item.t;
-    if(x)series.forEach(function(s){if(x[s.key]!=null)g+=bar(cx-bw/2,x[s.key],s.cls);});
+    if(x)series.forEach(function(s){if(x[s.key]!=null){
+      var grid=series.length>1,w=grid?bw*2/3:bw,offset=grid&&s.key==='e'?bw/3:0;
+      g+=bar(cx-bw/2+offset,x[s.key],s.cls,w);}});
     if(item.axis&&(n<=7||k%(n>12?5:(W<400?2:1))===0))
       g+='<text x="'+cx.toFixed(1)+'" y="'+(H-6)+'" text-anchor="middle">'+item.axis+'</text>';});
   g+='<line class="ax" x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(0).toFixed(1)+'" y2="'+Y(0).toFixed(1)+'"/>';
@@ -619,7 +622,7 @@ function overviewBars(items,title,prev,next,step,period,msg,partial,series){
 var PERIOD_SERIES={
   p:[{key:'p',label:'Solar production',cls:'cp'}],
   c:[{key:'c',label:'Consumption',cls:'cc'}],
-  grid:[{key:'e',label:'Grid export',cls:'ce'},{key:'i',label:'Grid import',cls:'ci'}]
+  grid:[{key:'i',label:'Grid import',cls:'ci'},{key:'e',label:'Grid export',cls:'ce'}]
 };
 function weekChart(kind){
   var t=todayKey(),e=wEnd||t,days=[];
@@ -730,19 +733,19 @@ function gridChart(){
   function X(k){return L+(k+0.5)*gw;}
   function Y(w){return T+ph-ph*w/(top*1000);}
   function bar(k,w,cls){if(!(w>0))return '';var y=Y(w);
-    return '<rect class="wb '+cls+'" x="'+(X(k)-bw/2).toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+(T+ph-y).toFixed(1)+'" rx="1.5"/>';}
+    return '<rect class="wb '+cls+'" x="'+(X(k)-bw/2+(cls==='ce'?bw/3:0)).toFixed(3)+'" y="'+y.toFixed(1)+'" width="'+(bw*2/3).toFixed(3)+'" height="'+(T+ph-y).toFixed(1)+'"/>';}
   curD=d;
   var g='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Grid import and export" data-cur="ie" data-w="'+W+'" data-l="'+L+'" data-pw="'+pw+'" data-n="'+n+'" data-t="'+T+'" data-ph="'+ph+'" data-top="'+top+'">';
   for(v=0;v<=top+1e-9;v+=st)g+='<line class="gl" x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(v*1000).toFixed(1)+'" y2="'+Y(v*1000).toFixed(1)+'"/>'+
     '<text x="'+(L-6)+'" y="'+(Y(v*1000)+4).toFixed(1)+'" text-anchor="end">'+(v?f(v,st<1?1:0):'kW')+'</text>';
-  for(i=0;i<n;i++)g+=bar(i,E(i),'ce')+bar(i,I(i),'ci');
+  for(i=0;i<n;i++)g+=bar(i,I(i),'ci')+bar(i,E(i),'ce');
   var hg={s:''};chHours(hg,L,pw,n,d.step,H);g+=hg.s;
   g+='<line class="ax" x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(0).toFixed(1)+'" y2="'+Y(0).toFixed(1)+'"/>';
   if(d.slot>=0)g+='<line class="now" x1="'+X(d.slot).toFixed(1)+'" x2="'+X(d.slot).toFixed(1)+'" y1="'+T+'" y2="'+Y(0).toFixed(1)+'"/>';
   g+=chMsg(cd.msg||(!anyI&&!anyE?'No grid history available':''),W,H)+'<g class="cur"></g></svg>';
   var kwh=function(w,any){return cd.msg||!any?'–':f(w*d.step/60000,1);};
-  var lg='<span><i class="ce"></i>Grid export <b>'+kwh(ex,anyE)+' kWh</b></span>'+
-    '<span><i class="ci"></i>Grid import <b>'+kwh(im,anyI)+' kWh</b></span>'+
+  var lg='<span><i class="ci"></i>Grid import <b>'+kwh(im,anyI)+' kWh</b></span>'+
+    '<span><i class="ce"></i>Grid export <b>'+kwh(ex,anyE)+' kWh</b></span>'+
     ((anyI||anyE)&&partial?'<span>Partial history</span>':'');
   return h+g+'<div class="lgd">'+lg+'</div></section>';
 }
