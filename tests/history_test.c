@@ -62,17 +62,23 @@ int main(void) {
     fclose(f);
 
     memset(&loaded, 0xFF, sizeof(loaded));
-    double production, consumption, solarBattery;
-    assert(!histEnergy(&loaded, &production, &consumption, &solarBattery));
+    double production, consumption, gridImport, gridExport;
+    assert(!histEnergy(&loaded, &production, &consumption, &gridImport, &gridExport));
     loaded.s[0] = 1000;
     loaded.b[0] = 200;
     loaded.g[0] = 300;
     loaded.p[0] = 2400;
     loaded.s[1] = 600;
-    assert(histEnergy(&loaded, &production, &consumption, &solarBattery));
+    assert(histEnergy(&loaded, &production, &consumption, &gridImport, &gridExport));
     assert(fabs(production - 0.2) < 1e-9);
     assert(fabs(consumption - 0.175) < 1e-9);
-    assert(fabs(solarBattery - 0.15) < 1e-9);
+    assert(isnan(gridImport) && isnan(gridExport));
+    HistData gridData = loaded;
+    gridData.i[0] = 400;
+    gridData.e[0] = 500;
+    assert(histEnergy(&gridData, &production, &consumption, &gridImport, &gridExport));
+    assert(fabs(gridImport - 400.0 * HIST_STEP_MIN / 60000.0) < 1e-9);
+    assert(fabs(gridExport - 500.0 * HIST_STEP_MIN / 60000.0) < 1e-9);
 
     time_t now = time(NULL);
     struct tm t;
@@ -101,10 +107,13 @@ int main(void) {
     assert(writeAtomic(today, &loaded, sizeof(loaded), NULL, 0));
     summaryResponse("year=2024", response, sizeof(response));
     assert(strstr(response, "200 OK"));
-    assert(strstr(response, "[20240229,0.200000,0.175000,0.150000]"));
+    assert(strstr(response, "[20240229,0.200000,0.175000,null,null]"));
     assert(!strstr(response, "20231231") && !strstr(response, "20240315"));
     summaryResponse("year=bad", response, sizeof(response));
     assert(strstr(response, "400 Bad Request"));
+    assert(writeAtomic(path, &gridData, sizeof(gridData), NULL, 0));
+    summaryResponse("year=2024", response, sizeof(response));
+    assert(strstr(response, "[20240229,0.200000,0.175000,0.033333,0.041667]"));
     f = fopen(path, "wb");
     assert(f && fwrite("x", 1, 1, f) == 1 && fclose(f) == 0);
     summaryResponse("year=2024", response, sizeof(response));
